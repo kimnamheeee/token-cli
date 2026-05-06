@@ -10,6 +10,7 @@ Project bootstrap for Phase 1 / Commit 1 is in place:
 - CLI entry point
 - Lint / format / typecheck configuration
 - Source directory scaffold
+- Initial token schema example and token loader utilities
 
 ## Planned command
 
