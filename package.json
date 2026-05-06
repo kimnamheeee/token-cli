@@ -1,0 +1,33 @@
+{
+  "name": "token-validator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CLI for validating design token usage in inline styles",
+  "bin": {
+    "token-validator": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli/index.ts",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
