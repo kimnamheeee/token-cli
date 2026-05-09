@@ -19,3 +19,18 @@ export interface LoadedTokens {
   entriesByPath: Map<string, FlattenedToken>;
   entriesByNormalizedValue: Map<string, FlattenedToken[]>;
 }
+
+export interface InlineStyleDeclaration {
+  property: string;
+  rawValue: string;
+  valueType: 'string' | 'number';
+  line: number;
+  column: number;
+}
+
+export interface InlineStyleBlock {
+  filePath: string;
+  line: number;
+  column: number;
+  declarations: InlineStyleDeclaration[];
+}

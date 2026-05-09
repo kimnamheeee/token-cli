@@ -1,8 +1,16 @@
+import { scan } from './scan.js';
+
 function main(): void {
-  const [, , command] = process.argv;
+  const [, , command, targetPath] = process.argv;
 
   if (command === 'scan') {
-    console.log('scan command is not implemented yet');
+    if (!targetPath) {
+      console.error('Usage: token-validator scan <target> --tokens <path>');
+      process.exitCode = 1;
+      return;
+    }
+
+    scan(targetPath);
     process.exitCode = 0;
     return;
   }

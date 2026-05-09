@@ -2,6 +2,7 @@
   "name": "token-validator",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "CLI for validating design token usage in inline styles",
   "bin": {
     "token-validator": "./dist/cli/index.js"
@@ -21,6 +22,10 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@babel/parser": "^7.28.0",
+    "@babel/traverse": "^7.28.0",
+    "@babel/types": "^7.28.0",
+    "@types/babel__traverse": "^7.28.0",
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

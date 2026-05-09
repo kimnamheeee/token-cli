@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "jsx": "react-jsx",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
-    "rootDir": "./src",
+    "rootDir": ".",
     "outDir": "./dist",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -15,6 +16,16 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "samples/**/*.ts",
+    "samples/**/*.tsx",
+    "samples/**/*.d.ts",
+    "test/**/*.ts",
+    "test/**/*.tsx",
+    "test/**/*.d.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }
