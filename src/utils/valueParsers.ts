@@ -73,15 +73,19 @@ const SPACING_PROPERTIES = new Set([
   'paddingBlockEnd',
   'paddingBlockStart',
   'paddingBottom',
+  'paddingHorizontal',
   'paddingInline',
   'paddingInlineEnd',
   'paddingInlineStart',
   'paddingLeft',
   'paddingRight',
   'paddingTop',
+  'paddingVertical',
   'right',
   'rowGap',
   'top',
+  'marginHorizontal',
+  'marginVertical',
 ]);
 
 function normalizeRawValue(value: string): string {

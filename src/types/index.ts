@@ -1,8 +1,10 @@
-export type TokenValue = string;
+export type TokenValue = string | number;
 
 export type TokenNode = {
   [key: string]: TokenNode | TokenValue;
 };
+
+export type TokenLayer = 'primitive' | 'semantic' | 'component' | 'unknown';
 
 export interface FlattenedToken {
   path: string;
@@ -10,6 +12,7 @@ export interface FlattenedToken {
   normalizedValue: string;
   segments: string[];
   group: string;
+  layer: TokenLayer;
 }
 
 export interface LoadedTokens {
