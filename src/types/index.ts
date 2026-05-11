@@ -52,3 +52,14 @@ export interface DeterministicTokenMatch extends DetectedHardcodedValue {
   case: 'deterministic';
   suggestion: string;
 }
+
+export interface AmbiguousTokenMatch extends DetectedHardcodedValue {
+  case: 'ambiguous';
+  candidates: string[];
+}
+
+export interface ClassifiedIssueSets {
+  deterministic: DeterministicTokenMatch[];
+  ambiguous: AmbiguousTokenMatch[];
+  unresolved: DetectedHardcodedValue[];
+}

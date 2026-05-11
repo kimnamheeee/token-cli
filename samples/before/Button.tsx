@@ -10,6 +10,7 @@ export function Button({ label }: ButtonProps) {
       style={{
         backgroundColor: '#2563eb',
         color: '#ffffff',
+        borderColor: '#1a1a1a',
         padding: '16px',
         marginTop: `8px`,
         borderRadius: 12,

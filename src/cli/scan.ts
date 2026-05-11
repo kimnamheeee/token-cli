@@ -1,25 +1,7 @@
+import { classifyIssues } from '../classifier/classifyIssues.js';
 import { detectHardcodedValues } from '../detector/detectHardcodedValues.js';
-import { matchTokens } from '../matcher/matchTokens.js';
 import { extractInlineStylesFromFile } from '../parser/extractInlineStyles.js';
 import { loadTokens } from '../tokens/loadTokens.js';
-
-function getDetectedValueKey(
-  detectedValue: {
-    filePath: string;
-    line: number;
-    column: number;
-    property: string;
-    rawValue: string;
-  },
-): string {
-  return [
-    detectedValue.filePath,
-    detectedValue.line,
-    detectedValue.column,
-    detectedValue.property,
-    detectedValue.rawValue,
-  ].join(':');
-}
 
 export function scan(targetPath: string, tokenPath?: string): void {
   const blocks = extractInlineStylesFromFile(targetPath);
@@ -37,22 +19,27 @@ export function scan(targetPath: string, tokenPath?: string): void {
 
   if (tokenPath) {
     const tokens = loadTokens(tokenPath);
-    const matches = matchTokens(detectedValues, tokens);
-    const matchedKeys = new Set(matches.map(getDetectedValueKey));
-    const otherHardcodedValues = detectedValues.filter(
-      (detectedValue) => !matchedKeys.has(getDetectedValueKey(detectedValue)),
-    );
+    const classifiedIssues = classifyIssues(detectedValues, tokens);
+    const {
+      deterministic,
+      ambiguous,
+      unresolved: otherHardcodedValues,
+    } = classifiedIssues;
 
-    if (matches.length === 0 && otherHardcodedValues.length === 0) {
+    if (
+      deterministic.length === 0
+      && ambiguous.length === 0
+      && otherHardcodedValues.length === 0
+    ) {
       console.log(`No exact matching tokens found for supported values in ${targetPath}`);
       return;
     }
 
-    if (matches.length > 0) {
+    if (deterministic.length > 0) {
       console.log('Deterministic matches');
       console.log('');
 
-      for (const match of matches) {
+      for (const match of deterministic) {
         console.log(`${match.filePath}:${match.line}:${match.column}`);
         console.log(
           `  ${match.property}: ${JSON.stringify(match.rawValue)}`
@@ -61,8 +48,25 @@ export function scan(targetPath: string, tokenPath?: string): void {
       }
     }
 
+    if (ambiguous.length > 0) {
+      if (deterministic.length > 0) {
+        console.log('');
+      }
+
+      console.log('Ambiguous matches');
+      console.log('');
+
+      for (const match of ambiguous) {
+        console.log(`${match.filePath}:${match.line}:${match.column}`);
+        console.log(
+          `  ${match.property}: ${JSON.stringify(match.rawValue)}`
+          + ` -> ${match.candidates.join(', ')} (${match.case})`,
+        );
+      }
+    }
+
     if (otherHardcodedValues.length > 0) {
-      if (matches.length > 0) {
+      if (deterministic.length > 0 || ambiguous.length > 0) {
         console.log('');
       }
 
