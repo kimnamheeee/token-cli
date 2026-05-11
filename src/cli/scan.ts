@@ -2,12 +2,23 @@ import { classifyIssues } from '../classifier/classifyIssues.js';
 import { detectHardcodedValues } from '../detector/detectHardcodedValues.js';
 import { extractInlineStylesFromFile } from '../parser/extractInlineStyles.js';
 import {
+  exportClassifiedJsonReport,
+  exportDetectionJsonReport,
+} from '../reporter/exportJsonReport.js';
+import {
   printClassifiedReport,
   printDetectionReport,
 } from '../reporter/printCliReport.js';
 import { loadTokens } from '../tokens/loadTokens.js';
 
-export function scan(targetPath: string, tokenPath?: string): void {
+export interface ScanOptions {
+  tokenPath?: string;
+  format?: 'json';
+  outputPath?: string;
+}
+
+export function scan(targetPath: string, options: ScanOptions = {}): void {
+  const { tokenPath, format, outputPath } = options;
   const blocks = extractInlineStylesFromFile(targetPath);
   const detectedValues = detectHardcodedValues(blocks);
 
@@ -42,6 +53,20 @@ export function scan(targetPath: string, tokenPath?: string): void {
       classifiedIssues,
     });
 
+    if (format === 'json' && outputPath) {
+      const resolvedOutputPath = exportClassifiedJsonReport({
+        targetPath,
+        tokenPath,
+        blockCount: blocks.length,
+        detectedValues,
+        classifiedIssues,
+        outputPath,
+      });
+
+      console.log('');
+      console.log(`Structured JSON report written to ${resolvedOutputPath}`);
+    }
+
     return;
   }
 
@@ -50,4 +75,16 @@ export function scan(targetPath: string, tokenPath?: string): void {
     blockCount: blocks.length,
     detectedValues,
   });
+
+  if (format === 'json' && outputPath) {
+    const resolvedOutputPath = exportDetectionJsonReport({
+      targetPath,
+      blockCount: blocks.length,
+      detectedValues,
+      outputPath,
+    });
+
+    console.log('');
+    console.log(`Structured JSON report written to ${resolvedOutputPath}`);
+  }
 }
