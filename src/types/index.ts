@@ -47,3 +47,8 @@ export interface DetectedHardcodedValue {
   valueType: 'string' | 'number';
   tokenGroup: SupportedTokenGroup;
 }
+
+export interface DeterministicTokenMatch extends DetectedHardcodedValue {
+  case: 'deterministic';
+  suggestion: string;
+}
