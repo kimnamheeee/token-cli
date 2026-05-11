@@ -34,3 +34,16 @@ export interface InlineStyleBlock {
   column: number;
   declarations: InlineStyleDeclaration[];
 }
+
+export type SupportedTokenGroup = 'color' | 'spacing';
+
+export interface DetectedHardcodedValue {
+  filePath: string;
+  line: number;
+  column: number;
+  property: string;
+  rawValue: string;
+  normalizedValue: string;
+  valueType: 'string' | 'number';
+  tokenGroup: SupportedTokenGroup;
+}
