@@ -1,10 +1,31 @@
 export type TokenValue = string | number;
+export type TokenResolvedValue = TokenValue | Record<string, TokenValue>;
 
 export type TokenNode = {
   [key: string]: TokenNode | TokenValue;
 };
 
 export type TokenLayer = 'primitive' | 'semantic' | 'component' | 'unknown';
+export type TokenType =
+  | 'color'
+  | 'spacing'
+  | 'radius'
+  | 'typography'
+  | 'shadow'
+  | 'unknown';
+
+export interface TokenRecord {
+  id: string;
+  path: string[];
+  rawValue: unknown;
+  resolvedValue: TokenResolvedValue;
+  normalizedResolvedValue: string;
+  type: TokenType;
+  level: TokenLayer;
+  source: string;
+  aliasOf?: string;
+  metadata?: Record<string, unknown>;
+}
 
 export interface FlattenedToken {
   path: string;
@@ -13,11 +34,18 @@ export interface FlattenedToken {
   segments: string[];
   group: string;
   layer: TokenLayer;
+  source: string;
+  rawValue?: unknown;
+  aliasOf?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LoadedTokens {
   sourcePath: string;
   tree: TokenNode;
+  records: TokenRecord[];
+  recordsById: Map<string, TokenRecord>;
+  recordsByNormalizedValue: Map<string, TokenRecord[]>;
   entries: FlattenedToken[];
   entriesByPath: Map<string, FlattenedToken>;
   entriesByNormalizedValue: Map<string, FlattenedToken[]>;

@@ -13,6 +13,8 @@ const SPACING_UNIT_PATTERN =
   /^-?(?:\d+|\d*\.\d+)(px|rem|em|%)$/i;
 const NUMBER_PATTERN =
   /^-?(?:\d+|\d*\.\d+)$/;
+const PX_UNIT_PATTERN =
+  /^(-?(?:\d+|\d*\.\d+))px$/i;
 
 const COLOR_PROPERTIES = new Set([
   'accentColor',
@@ -141,9 +143,14 @@ export function parseSpacingValue(
   valueType: InlineStyleDeclaration['valueType'],
 ): string | null {
   const normalizedValue = normalizeRawValue(rawValue);
+  const pxMatch = normalizedValue.match(PX_UNIT_PATTERN);
 
   if (valueType === 'number') {
     return NUMBER_PATTERN.test(normalizedValue) ? normalizedValue : null;
+  }
+
+  if (pxMatch?.[1]) {
+    return pxMatch[1];
   }
 
   if (

@@ -175,7 +175,7 @@ export function printClassifiedReport({
   console.log('');
   console.log(bold('Classification'));
   console.log(
-    `${colorize('- deterministic', ANSI.green)}: ${classifiedIssues.deterministic.length}  ${colorize('→ one clear token match', ANSI.dim)}`,
+    `${colorize('- deterministic', ANSI.green)}: ${classifiedIssues.deterministic.length}  ${colorize('→ exactly one token candidate', ANSI.dim)}`,
   );
   console.log(
     `${colorize('- ambiguous', ANSI.yellow)}: ${classifiedIssues.ambiguous.length}      ${colorize('→ multiple token candidates', ANSI.dim)}`,

@@ -1,4 +1,6 @@
-import { findExactMatchingTokens } from '../matcher/matchTokens.js';
+import {
+  findExactMatchingTokens,
+} from '../matcher/matchTokens.js';
 import type {
   AmbiguousTokenMatch,
   ClassifiedIssueSets,
@@ -23,13 +25,13 @@ function toDeterministicMatch(
 
 function toAmbiguousMatch(
   detectedValue: DetectedHardcodedValue,
-  candidates: string[],
+  candidates: AmbiguousTokenMatch['candidates'],
 ): AmbiguousTokenMatch {
   return {
     ...detectedValue,
     case: 'ambiguous',
     candidates,
-    reason: 'same raw value is used by multiple tokens',
+    reason: 'multiple token candidates were found',
   };
 }
 
@@ -63,8 +65,8 @@ export function classifyIssues(
   const unsupported: UnsupportedMatch[] = [];
 
   for (const detectedValue of detectedValues) {
-    const hasTokenCategory = tokens.entries.some(
-      (entry) => entry.group === detectedValue.tokenGroup,
+    const hasTokenCategory = tokens.records.some(
+      (record) => record.type === detectedValue.tokenGroup,
     );
 
     if (!hasTokenCategory) {
@@ -73,16 +75,14 @@ export function classifyIssues(
     }
 
     const exactMatches = findExactMatchingTokens(detectedValue, tokens);
+    const deterministicCandidate = exactMatches.length === 1
+      ? exactMatches[0] ?? null
+      : null;
 
-    if (exactMatches.length === 1) {
-      const [exactMatch] = exactMatches;
-
-      if (exactMatch) {
-        deterministic.push(
-          toDeterministicMatch(detectedValue, exactMatch.path),
-        );
-      }
-
+    if (deterministicCandidate) {
+      deterministic.push(
+        toDeterministicMatch(detectedValue, deterministicCandidate.id),
+      );
       continue;
     }
 
@@ -90,7 +90,7 @@ export function classifyIssues(
       ambiguous.push(
         toAmbiguousMatch(
           detectedValue,
-          exactMatches.map((exactMatch) => exactMatch.path),
+          exactMatches.map((exactMatch) => exactMatch.id),
         ),
       );
       continue;

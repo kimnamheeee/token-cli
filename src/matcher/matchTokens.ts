@@ -1,15 +1,15 @@
 import type {
   DetectedHardcodedValue,
   DeterministicTokenMatch,
-  FlattenedToken,
   LoadedTokens,
+  TokenRecord,
 } from '../types/index.js';
 
 export function findExactMatchingTokens(
   detectedValue: DetectedHardcodedValue,
   tokens: LoadedTokens,
-): FlattenedToken[] {
-  const candidates = tokens.entriesByNormalizedValue.get(
+): TokenRecord[] {
+  const candidates = tokens.recordsByNormalizedValue.get(
     detectedValue.normalizedValue,
   );
 
@@ -17,7 +17,7 @@ export function findExactMatchingTokens(
     return [];
   }
 
-  return candidates.filter((candidate) => candidate.group === detectedValue.tokenGroup);
+  return candidates.filter((candidate) => candidate.type === detectedValue.tokenGroup);
 }
 
 export function matchTokens(
@@ -42,7 +42,7 @@ export function matchTokens(
     matches.push({
       ...detectedValue,
       case: 'deterministic',
-      suggestion: exactMatch.path,
+      suggestion: exactMatch.id,
       reason: 'exactly one matching token was found',
     });
   }
