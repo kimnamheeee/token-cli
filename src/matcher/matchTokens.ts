@@ -43,6 +43,7 @@ export function matchTokens(
       ...detectedValue,
       case: 'deterministic',
       suggestion: exactMatch.path,
+      reason: 'exactly one matching token was found',
     });
   }
 

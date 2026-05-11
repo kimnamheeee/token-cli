@@ -35,7 +35,7 @@ export interface InlineStyleBlock {
   declarations: InlineStyleDeclaration[];
 }
 
-export type SupportedTokenGroup = 'color' | 'spacing';
+export type SupportedTokenGroup = 'color' | 'spacing' | 'radius';
 
 export interface DetectedHardcodedValue {
   filePath: string;
@@ -51,15 +51,28 @@ export interface DetectedHardcodedValue {
 export interface DeterministicTokenMatch extends DetectedHardcodedValue {
   case: 'deterministic';
   suggestion: string;
+  reason: string;
 }
 
 export interface AmbiguousTokenMatch extends DetectedHardcodedValue {
   case: 'ambiguous';
   candidates: string[];
+  reason: string;
+}
+
+export interface NoCandidateMatch extends DetectedHardcodedValue {
+  case: 'no-candidate';
+  reason: string;
+}
+
+export interface UnsupportedMatch extends DetectedHardcodedValue {
+  case: 'unsupported';
+  reason: string;
 }
 
 export interface ClassifiedIssueSets {
   deterministic: DeterministicTokenMatch[];
   ambiguous: AmbiguousTokenMatch[];
-  unresolved: DetectedHardcodedValue[];
+  noCandidate: NoCandidateMatch[];
+  unsupported: UnsupportedMatch[];
 }

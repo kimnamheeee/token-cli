@@ -37,12 +37,15 @@ const COLOR_PROPERTIES = new Set([
   'textDecorationColor',
 ]);
 
-const SPACING_PROPERTIES = new Set([
+const RADIUS_PROPERTIES = new Set([
   'borderRadius',
   'borderTopLeftRadius',
   'borderTopRightRadius',
   'borderBottomLeftRadius',
   'borderBottomRightRadius',
+]);
+
+const SPACING_PROPERTIES = new Set([
   'bottom',
   'columnGap',
   'gap',
@@ -93,11 +96,19 @@ export function isSupportedSpacingProperty(property: string): boolean {
   return SPACING_PROPERTIES.has(property);
 }
 
+export function isSupportedRadiusProperty(property: string): boolean {
+  return RADIUS_PROPERTIES.has(property);
+}
+
 export function getSupportedTokenGroup(
   property: string,
 ): SupportedTokenGroup | null {
   if (isSupportedColorProperty(property)) {
     return 'color';
+  }
+
+  if (isSupportedRadiusProperty(property)) {
+    return 'radius';
   }
 
   if (isSupportedSpacingProperty(property)) {
