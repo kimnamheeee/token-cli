@@ -39,7 +39,6 @@ test('exportDetectionJsonReport writes summary and detected issues', () => {
 
   const resolvedPath = exportDetectionJsonReport({
     targetPath: './src',
-    blockCount: 2,
     detectedValues: [createDetectedValue()],
     outputPath,
   });
@@ -102,8 +101,6 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
 
   const resolvedPath = exportClassifiedJsonReport({
     targetPath: './src',
-    blockCount: 2,
-    detectedValues: [deterministic, ambiguous],
     classifiedIssues,
     outputPath,
   });

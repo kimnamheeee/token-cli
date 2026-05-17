@@ -56,9 +56,6 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
     if (format === 'json' && outputPath) {
       const resolvedOutputPath = exportClassifiedJsonReport({
         targetPath,
-        tokenPath,
-        blockCount: blocks.length,
-        detectedValues,
         classifiedIssues,
         outputPath,
       });
@@ -79,7 +76,6 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
   if (format === 'json' && outputPath) {
     const resolvedOutputPath = exportDetectionJsonReport({
       targetPath,
-      blockCount: blocks.length,
       detectedValues,
       outputPath,
     });

@@ -46,13 +46,14 @@ type StructuredIssue =
 
 interface DetectionJsonReportInput {
   targetPath: string;
-  blockCount: number;
   detectedValues: DetectedHardcodedValue[];
   outputPath: string;
 }
 
-interface ClassifiedJsonReportInput extends DetectionJsonReportInput {
+interface ClassifiedJsonReportInput {
+  targetPath: string;
   classifiedIssues: ClassifiedIssueSets;
+  outputPath: string;
 }
 
 function toBaseIssue(
