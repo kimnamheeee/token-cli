@@ -47,10 +47,11 @@ test('exportDetectionJsonReport writes summary and detected issues', () => {
   const report = readJson(resolvedPath);
 
   assert.equal(report.target, './src');
-  assert.equal(report.summary.inline_style_blocks, 2);
-  assert.equal(report.summary.supported_hardcoded_values, 1);
-  assert.equal(report.issues[0].detected_type, 'number-like string');
+  assert.equal(report.issues.length, 1);
   assert.equal(report.issues[0].case, 'detected');
+  assert.equal(report.issues[0].value, '12');
+  assert.equal(report.issues[0].property, 'borderRadius');
+  assert.equal(report.summary, undefined);
 });
 
 test('exportClassifiedJsonReport writes sorted issues with classification metadata', () => {
@@ -101,7 +102,6 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
 
   const resolvedPath = exportClassifiedJsonReport({
     targetPath: './src',
-    tokenPath: './tokens.json',
     blockCount: 2,
     detectedValues: [deterministic, ambiguous],
     classifiedIssues,
@@ -110,13 +110,14 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
 
   const report = readJson(resolvedPath);
 
-  assert.equal(report.summary.deterministic, 1);
-  assert.equal(report.summary.ambiguous, 1);
-  assert.equal(report.summary.issues, 2);
+  assert.equal(report.issues.length, 2);
   assert.equal(report.issues[0].file, 'src/A.tsx');
+  assert.equal(report.issues[0].value, '#ff0000');
   assert.deepEqual(report.issues[0].candidates, [
     'semantic.color.text.primary',
     'semantic.color.icon.primary',
   ]);
   assert.equal(report.issues[1].token, 'semantic.spacing.md');
+  assert.equal(report.issues[1].value, '8');
+  assert.equal(report.token_source, undefined);
 });
