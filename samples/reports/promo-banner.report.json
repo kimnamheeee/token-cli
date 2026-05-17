@@ -1,0 +1,119 @@
+{
+  "target": "samples/before/PromoBanner.tsx",
+  "issues": [
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 5,
+      "column": 8,
+      "property": "backgroundColor",
+      "value": "#FFF7ED",
+      "case": "no-candidate"
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 6,
+      "column": 8,
+      "property": "borderColor",
+      "value": "#FED7AA",
+      "case": "no-candidate"
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 7,
+      "column": 8,
+      "property": "borderRadius",
+      "value": "14",
+      "case": "no-candidate"
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 8,
+      "column": 8,
+      "property": "padding",
+      "value": "28",
+      "case": "deterministic",
+      "token": "primitive.spacing.28"
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 9,
+      "column": 8,
+      "property": "rowGap",
+      "value": "12",
+      "case": "ambiguous",
+      "candidates": [
+        "primitive.spacing.12",
+        "semantic.spacing.stackMd",
+        "component.card.default.rowGap"
+      ]
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 14,
+      "column": 10,
+      "property": "color",
+      "value": "#1D4ED8",
+      "case": "ambiguous",
+      "candidates": [
+        "primitive.color.blue700",
+        "semantic.color.actionPrimaryHover"
+      ]
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 15,
+      "column": 10,
+      "property": "marginBottom",
+      "value": "8",
+      "case": "ambiguous",
+      "candidates": [
+        "primitive.spacing.8",
+        "semantic.spacing.insetSm",
+        "semantic.spacing.stackSm",
+        "component.button.primary.paddingVertical",
+        "component.badge.neutral.paddingHorizontal"
+      ]
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 23,
+      "column": 10,
+      "property": "color",
+      "value": "#334155",
+      "case": "ambiguous",
+      "candidates": [
+        "primitive.color.slate700",
+        "semantic.color.textSecondary"
+      ]
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 24,
+      "column": 10,
+      "property": "marginBottom",
+      "value": "16",
+      "case": "ambiguous",
+      "candidates": [
+        "primitive.spacing.16",
+        "semantic.spacing.insetMd",
+        "semantic.spacing.stackLg",
+        "component.card.default.padding",
+        "component.card.elevated.rowGap",
+        "component.button.primary.paddingHorizontal"
+      ]
+    },
+    {
+      "file": "/Users/knh/Desktop/token-cli/samples/before/PromoBanner.tsx",
+      "line": 33,
+      "column": 10,
+      "property": "color",
+      "value": "#2563EB",
+      "case": "ambiguous",
+      "candidates": [
+        "primitive.color.blue600",
+        "semantic.color.actionPrimary",
+        "component.button.primary.backgroundColor"
+      ]
+    }
+  ]
+}
