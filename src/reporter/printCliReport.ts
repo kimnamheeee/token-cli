@@ -92,7 +92,6 @@ function printDeterministicMatch(
   console.log(
     `    suggested token: ${colorize(match.suggestion, ANSI.bold, ANSI.green)}`,
   );
-  console.log(`    reason: ${match.reason}`);
 }
 
 function printAmbiguousMatch(
@@ -106,8 +105,6 @@ function printAmbiguousMatch(
   for (const candidate of match.candidates) {
     console.log(`      - ${colorize(candidate, ANSI.bold, ANSI.yellow)}`);
   }
-
-  console.log(`    reason: ${match.reason}`);
 }
 
 function printNoCandidateMatch(
@@ -117,7 +114,6 @@ function printNoCandidateMatch(
   printIssueHeader(index, match);
   printBaseIssueDetails(match);
   console.log(`    detected type: ${formatDetectedType(match)}`);
-  console.log(`    reason: ${match.reason}`);
 }
 
 function printUnsupportedMatch(
@@ -127,7 +123,6 @@ function printUnsupportedMatch(
   printIssueHeader(index, match);
   printBaseIssueDetails(match);
   console.log(`    detected type: ${formatDetectedType(match)}`);
-  console.log(`    reason: ${match.reason}`);
 }
 
 export function printDetectionReport({
