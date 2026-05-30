@@ -1,6 +1,7 @@
 import {
   findExactMatchingTokens,
 } from '../matcher/matchTokens.js';
+import { rankTokenCandidates } from '../matcher/rankTokenCandidates.js';
 import type {
   AmbiguousTokenMatch,
   ClassifiedIssueSets,
@@ -8,6 +9,7 @@ import type {
   DeterministicTokenMatch,
   LoadedTokens,
   NoCandidateMatch,
+  TokenRecord,
   UnsupportedMatch,
 } from '../types/index.js';
 
@@ -25,12 +27,13 @@ function toDeterministicMatch(
 
 function toAmbiguousMatch(
   detectedValue: DetectedHardcodedValue,
-  candidates: AmbiguousTokenMatch['candidates'],
+  exactMatches: TokenRecord[],
 ): AmbiguousTokenMatch {
   return {
     ...detectedValue,
     case: 'ambiguous',
-    candidates,
+    candidates: exactMatches.map((exactMatch) => exactMatch.id),
+    rankedCandidates: rankTokenCandidates(detectedValue, exactMatches),
     reason: 'multiple token candidates were found',
   };
 }
@@ -88,10 +91,7 @@ export function classifyIssues(
 
     if (exactMatches.length > 1) {
       ambiguous.push(
-        toAmbiguousMatch(
-          detectedValue,
-          exactMatches.map((exactMatch) => exactMatch.id),
-        ),
+        toAmbiguousMatch(detectedValue, exactMatches),
       );
       continue;
     }

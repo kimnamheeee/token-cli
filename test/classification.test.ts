@@ -6,6 +6,7 @@ import {
   findExactMatchingTokens,
   matchTokens,
 } from '../src/matcher/matchTokens.js';
+import { rankTokenCandidates } from '../src/matcher/rankTokenCandidates.js';
 import type {
   DetectedHardcodedValue,
   LoadedTokens,
@@ -16,6 +17,7 @@ function createRecord(
   id: string,
   normalizedResolvedValue: string,
   type: TokenRecord['type'],
+  overrides: Partial<TokenRecord> = {},
 ): TokenRecord {
   return {
     id,
@@ -26,7 +28,27 @@ function createRecord(
     type,
     level: 'semantic',
     source: '<test>',
+    ...overrides,
   };
+}
+
+function groupRecordsByNormalizedValue(
+  records: TokenRecord[],
+): Map<string, TokenRecord[]> {
+  const recordsByNormalizedValue = new Map<string, TokenRecord[]>();
+
+  for (const record of records) {
+    const bucket = recordsByNormalizedValue.get(record.normalizedResolvedValue);
+
+    if (bucket) {
+      bucket.push(record);
+      continue;
+    }
+
+    recordsByNormalizedValue.set(record.normalizedResolvedValue, [record]);
+  }
+
+  return recordsByNormalizedValue;
 }
 
 function createLoadedTokens(records: TokenRecord[]): LoadedTokens {
@@ -35,11 +57,7 @@ function createLoadedTokens(records: TokenRecord[]): LoadedTokens {
     tree: {},
     records,
     recordsById: new Map(records.map((record) => [record.id, record])),
-    recordsByNormalizedValue: new Map([
-      ['#ff0000', records.filter((record) => record.normalizedResolvedValue === '#ff0000')],
-      ['8', records.filter((record) => record.normalizedResolvedValue === '8')],
-      ['12', records.filter((record) => record.normalizedResolvedValue === '12')],
-    ]),
+    recordsByNormalizedValue: groupRecordsByNormalizedValue(records),
     entries: [],
     entriesByPath: new Map(),
     entriesByNormalizedValue: new Map(),
@@ -146,4 +164,97 @@ test('classifyIssues splits values into deterministic, ambiguous, no-candidate, 
 
   assert.equal(classified.unsupported.length, 1);
   assert.match(classified.unsupported[0]?.reason ?? '', /radius token category/i);
+});
+
+test('rankTokenCandidates prioritizes property role matches over raw primitive tokens', () => {
+  const candidates = [
+    createRecord('primitive.color.slate900', '#ff0000', 'color', {
+      level: 'primitive',
+    }),
+    createRecord('semantic.color.text.primary', '#ff0000', 'color', {
+      aliasOf: 'primitive.color.slate900',
+    }),
+    createRecord('semantic.color.surface.default', '#ff0000', 'color', {
+      aliasOf: 'primitive.color.slate900',
+    }),
+  ];
+
+  const rankedCandidates = rankTokenCandidates(createDetectedValue(), candidates);
+
+  assert.deepEqual(
+    rankedCandidates.map((candidate) => candidate.id),
+    [
+      'semantic.color.text.primary',
+      'semantic.color.surface.default',
+      'primitive.color.slate900',
+    ],
+  );
+  assert.ok(rankedCandidates[0]?.score ?? 0 > (rankedCandidates[1]?.score ?? 0));
+  assert.match(rankedCandidates[0]?.reasons.join(' ') ?? '', /color role keyword/i);
+});
+
+test('rankTokenCandidates uses component context without making component tokens globally preferred', () => {
+  const candidates = [
+    createRecord('semantic.color.surface.default', '#ff0000', 'color', {
+      aliasOf: 'primitive.color.white',
+    }),
+    createRecord('component.card.default.backgroundColor', '#ff0000', 'color', {
+      level: 'component',
+      aliasOf: 'semantic.color.surface.default',
+      metadata: {
+        component: 'card',
+        role: 'backgroundColor',
+      },
+    }),
+  ];
+
+  const productCardRanking = rankTokenCandidates(
+    createDetectedValue({
+      filePath: 'ProductCard.tsx',
+      property: 'backgroundColor',
+    }),
+    candidates,
+  );
+
+  assert.equal(
+    productCardRanking[0]?.id,
+    'component.card.default.backgroundColor',
+  );
+  assert.match(productCardRanking[0]?.reasons.join(' ') ?? '', /file context/i);
+
+  const unrelatedRanking = rankTokenCandidates(
+    createDetectedValue({
+      filePath: 'SettingsPanel.tsx',
+      property: 'backgroundColor',
+    }),
+    candidates,
+  );
+
+  assert.equal(unrelatedRanking[0]?.id, 'semantic.color.surface.default');
+});
+
+test('classifyIssues attaches ranked candidates without changing ambiguous classification', () => {
+  const tokens = createLoadedTokens([
+    createRecord('primitive.color.slate900', '#ff0000', 'color', {
+      level: 'primitive',
+    }),
+    createRecord('semantic.color.text.primary', '#ff0000', 'color', {
+      aliasOf: 'primitive.color.slate900',
+    }),
+  ]);
+
+  const classified = classifyIssues([createDetectedValue()], tokens);
+
+  assert.equal(classified.ambiguous.length, 1);
+  assert.deepEqual(classified.ambiguous[0]?.candidates, [
+    'primitive.color.slate900',
+    'semantic.color.text.primary',
+  ]);
+  assert.deepEqual(
+    classified.ambiguous[0]?.rankedCandidates?.map((candidate) => candidate.id),
+    [
+      'semantic.color.text.primary',
+      'primitive.color.slate900',
+    ],
+  );
 });
