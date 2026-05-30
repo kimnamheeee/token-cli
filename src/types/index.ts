@@ -85,9 +85,16 @@ export interface DeterministicTokenMatch extends DetectedHardcodedValue {
   reason: string;
 }
 
+export interface RankedTokenCandidate {
+  id: string;
+  score: number;
+  reasons: string[];
+}
+
 export interface AmbiguousTokenMatch extends DetectedHardcodedValue {
   case: 'ambiguous';
   candidates: string[];
+  rankedCandidates?: RankedTokenCandidate[];
   reason: string;
 }
 
