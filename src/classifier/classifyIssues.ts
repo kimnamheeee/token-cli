@@ -1,6 +1,4 @@
-import {
-  findExactMatchingTokens,
-} from '../matcher/matchTokens.js';
+import { findExactMatchingTokens } from '../matcher/matchTokens.js';
 import { rankTokenCandidates } from '../matcher/rankTokenCandidates.js';
 import type {
   AmbiguousTokenMatch,
@@ -21,7 +19,7 @@ function toDeterministicMatch(
     ...detectedValue,
     case: 'deterministic',
     suggestion,
-    reason: 'exactly one matching token was found',
+    reason: 'single exact token candidate was found',
   };
 }
 
@@ -78,9 +76,8 @@ export function classifyIssues(
     }
 
     const exactMatches = findExactMatchingTokens(detectedValue, tokens);
-    const deterministicCandidate = exactMatches.length === 1
-      ? exactMatches[0] ?? null
-      : null;
+    const deterministicCandidate =
+      exactMatches.length === 1 ? (exactMatches[0] ?? null) : null;
 
     if (deterministicCandidate) {
       deterministic.push(
@@ -90,9 +87,7 @@ export function classifyIssues(
     }
 
     if (exactMatches.length > 1) {
-      ambiguous.push(
-        toAmbiguousMatch(detectedValue, exactMatches),
-      );
+      ambiguous.push(toAmbiguousMatch(detectedValue, exactMatches));
       continue;
     }
 

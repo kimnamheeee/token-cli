@@ -17,7 +17,9 @@ export function findExactMatchingTokens(
     return [];
   }
 
-  return candidates.filter((candidate) => candidate.type === detectedValue.tokenGroup);
+  return candidates.filter(
+    (candidate) => candidate.type === detectedValue.tokenGroup,
+  );
 }
 
 export function matchTokens(
@@ -43,7 +45,7 @@ export function matchTokens(
       ...detectedValue,
       case: 'deterministic',
       suggestion: exactMatch.id,
-      reason: 'exactly one matching token was found',
+      reason: 'single exact token candidate was found',
     });
   }
 

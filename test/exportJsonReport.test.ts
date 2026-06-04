@@ -91,7 +91,22 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
       {
         ...ambiguous,
         case: 'ambiguous',
-        candidates: ['semantic.color.text.primary', 'semantic.color.icon.primary'],
+        candidates: [
+          'semantic.color.text.primary',
+          'semantic.color.icon.primary',
+        ],
+        rankedCandidates: [
+          {
+            id: 'semantic.color.text.primary',
+            score: 45,
+            reasons: ['matches color role keyword: text'],
+          },
+          {
+            id: 'semantic.color.icon.primary',
+            score: 15,
+            reasons: ['semantic token is preferred over raw primitive tokens'],
+          },
+        ],
         reason: 'multiple token candidates were found',
       },
     ],
@@ -113,6 +128,18 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
   assert.deepEqual(report.issues[0].candidates, [
     'semantic.color.text.primary',
     'semantic.color.icon.primary',
+  ]);
+  assert.deepEqual(report.issues[0].rankedCandidates, [
+    {
+      id: 'semantic.color.text.primary',
+      score: 45,
+      reasons: ['matches color role keyword: text'],
+    },
+    {
+      id: 'semantic.color.icon.primary',
+      score: 15,
+      reasons: ['semantic token is preferred over raw primitive tokens'],
+    },
   ]);
   assert.equal(report.issues[1].token, 'semantic.spacing.md');
   assert.equal(report.issues[1].value, '8');

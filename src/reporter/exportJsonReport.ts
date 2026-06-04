@@ -4,6 +4,7 @@ import path from 'node:path';
 import type {
   ClassifiedIssueSets,
   DetectedHardcodedValue,
+  RankedTokenCandidate,
 } from '../types/index.js';
 
 interface BaseStructuredIssue {
@@ -27,6 +28,7 @@ interface DeterministicStructuredIssue extends BaseStructuredIssue {
 interface AmbiguousStructuredIssue extends BaseStructuredIssue {
   case: 'ambiguous';
   candidates: string[];
+  rankedCandidates?: RankedTokenCandidate[];
 }
 
 interface NoCandidateStructuredIssue extends BaseStructuredIssue {
@@ -97,27 +99,36 @@ export function exportClassifiedJsonReport({
   classifiedIssues,
   outputPath,
 }: ClassifiedJsonReportInput): string {
-  const deterministic: StructuredIssue[] = classifiedIssues.deterministic.map((issue) => ({
-    ...toBaseIssue(issue),
-    case: 'deterministic',
-    token: issue.suggestion,
-  }));
+  const deterministic: StructuredIssue[] = classifiedIssues.deterministic.map(
+    (issue) => ({
+      ...toBaseIssue(issue),
+      case: 'deterministic',
+      token: issue.suggestion,
+    }),
+  );
 
-  const ambiguous: StructuredIssue[] = classifiedIssues.ambiguous.map((issue) => ({
-    ...toBaseIssue(issue),
-    case: 'ambiguous',
-    candidates: issue.candidates,
-  }));
+  const ambiguous: StructuredIssue[] = classifiedIssues.ambiguous.map(
+    (issue) => ({
+      ...toBaseIssue(issue),
+      case: 'ambiguous',
+      candidates: issue.candidates,
+      rankedCandidates: issue.rankedCandidates,
+    }),
+  );
 
-  const noCandidate: StructuredIssue[] = classifiedIssues.noCandidate.map((issue) => ({
-    ...toBaseIssue(issue),
-    case: 'no-candidate',
-  }));
+  const noCandidate: StructuredIssue[] = classifiedIssues.noCandidate.map(
+    (issue) => ({
+      ...toBaseIssue(issue),
+      case: 'no-candidate',
+    }),
+  );
 
-  const unsupported: StructuredIssue[] = classifiedIssues.unsupported.map((issue) => ({
-    ...toBaseIssue(issue),
-    case: 'unsupported',
-  }));
+  const unsupported: StructuredIssue[] = classifiedIssues.unsupported.map(
+    (issue) => ({
+      ...toBaseIssue(issue),
+      case: 'unsupported',
+    }),
+  );
 
   const issues = [
     ...deterministic,

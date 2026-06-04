@@ -27,10 +27,7 @@ function getCandidateWords(candidate: TokenRecord): Set<string> {
     .filter((value): value is string => typeof value === 'string')
     .flatMap(normalizeWords);
 
-  return new Set([
-    ...candidate.path.flatMap(normalizeWords),
-    ...metadataWords,
-  ]);
+  return new Set([...candidate.path.flatMap(normalizeWords), ...metadataWords]);
 }
 
 function getRoleKeywords(property: string): string[] {
@@ -58,9 +55,9 @@ function getRoleKeywords(property: string): string[] {
   }
 
   if (
-    propertyWords.includes('gap')
-    || lowerProperty.startsWith('margin')
-    || lowerProperty.endsWith('gap')
+    propertyWords.includes('gap') ||
+    lowerProperty.startsWith('margin') ||
+    lowerProperty.endsWith('gap')
   ) {
     return ['stack', 'gap', 'space'];
   }
@@ -92,11 +89,24 @@ function hasMatchingComponentContext(
     return false;
   }
 
-  const fileBaseName = path.basename(detectedValue.filePath, path.extname(detectedValue.filePath));
+  const fileBaseName = path.basename(
+    detectedValue.filePath,
+    path.extname(detectedValue.filePath),
+  );
   const fileWords = normalizeWords(fileBaseName);
   const componentWords = normalizeWords(componentName);
 
   return componentWords.some((word) => fileWords.includes(word));
+}
+
+function isUnrelatedComponentToken(
+  detectedValue: DetectedHardcodedValue,
+  candidate: TokenRecord,
+): boolean {
+  return (
+    candidate.level === 'component' &&
+    !hasMatchingComponentContext(detectedValue, candidate)
+  );
 }
 
 function scoreCandidate(
@@ -106,8 +116,8 @@ function scoreCandidate(
   let score = 0;
   const reasons: string[] = [];
   const candidateWords = getCandidateWords(candidate);
-  const matchedRoleKeywords = getRoleKeywords(detectedValue.property).filter((keyword) =>
-    candidateWords.has(keyword),
+  const matchedRoleKeywords = getRoleKeywords(detectedValue.property).filter(
+    (keyword) => candidateWords.has(keyword),
   );
 
   if (matchedRoleKeywords.length > 0) {
@@ -127,16 +137,27 @@ function scoreCandidate(
   }
 
   if (
-    candidate.level === 'component'
-    && hasMatchingComponentContext(detectedValue, candidate)
+    candidate.level === 'component' &&
+    hasMatchingComponentContext(detectedValue, candidate)
   ) {
     score += 18;
     reasons.push('component token matches the file context');
   }
 
-  if (candidate.aliasOf && candidate.level !== 'primitive') {
+  if (isUnrelatedComponentToken(detectedValue, candidate)) {
+    score -= 10;
+    reasons.push('component token does not match the file context');
+  }
+
+  if (
+    candidate.aliasOf &&
+    candidate.level !== 'primitive' &&
+    !isUnrelatedComponentToken(detectedValue, candidate)
+  ) {
     score += 5;
-    reasons.push('token aliases another token instead of using a raw primitive value');
+    reasons.push(
+      'token aliases another token instead of using a raw primitive value',
+    );
   }
 
   if (reasons.length === 0) {
@@ -154,7 +175,9 @@ export function rankTokenCandidates(
   detectedValue: DetectedHardcodedValue,
   candidates: TokenRecord[],
 ): RankedTokenCandidate[] {
-  const candidatesById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const candidatesById = new Map(
+    candidates.map((candidate) => [candidate.id, candidate]),
+  );
 
   return candidates
     .map((candidate) => scoreCandidate(detectedValue, candidate))

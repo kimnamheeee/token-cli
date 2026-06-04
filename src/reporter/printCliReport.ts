@@ -49,11 +49,45 @@ function formatDetectedType(detectedValue: DetectedHardcodedValue): string {
     return detectedValue.tokenGroup;
   }
 
-  if (detectedValue.tokenGroup === 'radius' && /^-?(?:\d+|\d*\.\d+)$/.test(detectedValue.rawValue)) {
+  if (
+    detectedValue.tokenGroup === 'radius' &&
+    /^-?(?:\d+|\d*\.\d+)$/.test(detectedValue.rawValue)
+  ) {
     return 'number-like string';
   }
 
   return detectedValue.tokenGroup;
+}
+
+function getRecommendationConfidence(
+  match: AmbiguousTokenMatch,
+): 'high' | 'medium' | 'low' {
+  const [topCandidate, nextCandidate] = match.rankedCandidates ?? [];
+
+  if (!topCandidate || !nextCandidate) {
+    return 'low';
+  }
+
+  const hasStrongReason = topCandidate.reasons.some(
+    (reason) =>
+      reason.includes('role keyword') || reason.includes('file context'),
+  );
+
+  if (!hasStrongReason) {
+    return 'low';
+  }
+
+  const scoreGap = topCandidate.score - nextCandidate.score;
+
+  if (scoreGap >= 20) {
+    return 'high';
+  }
+
+  if (scoreGap >= 10) {
+    return 'medium';
+  }
+
+  return 'low';
 }
 
 function printSectionHeader(
@@ -90,16 +124,42 @@ function printDeterministicMatch(
   printIssueHeader(index, match);
   printBaseIssueDetails(match);
   console.log(
-    `    suggested token: ${colorize(match.suggestion, ANSI.bold, ANSI.green)}`,
+    `    single exact candidate: ${colorize(match.suggestion, ANSI.bold, ANSI.green)}`,
   );
 }
 
-function printAmbiguousMatch(
-  index: number,
-  match: AmbiguousTokenMatch,
-): void {
+function printAmbiguousMatch(index: number, match: AmbiguousTokenMatch): void {
   printIssueHeader(index, match);
   printBaseIssueDetails(match);
+
+  const [topCandidate] = match.rankedCandidates ?? [];
+  const visibleRankedCandidates = (match.rankedCandidates ?? []).filter(
+    (candidate) => candidate.score >= 0,
+  );
+
+  if (topCandidate) {
+    const confidence = getRecommendationConfidence(match);
+
+    console.log(
+      `    top recommendation: ${colorize(topCandidate.id, ANSI.bold, ANSI.yellow)} ${colorize(`(score ${topCandidate.score}, ${confidence} confidence)`, ANSI.dim)}`,
+    );
+    console.log('    reasons:');
+
+    for (const reason of topCandidate.reasons) {
+      console.log(`      - ${reason}`);
+    }
+
+    console.log('    ranked candidates:');
+
+    for (const candidate of visibleRankedCandidates) {
+      console.log(
+        `      - ${colorize(candidate.id, ANSI.bold, ANSI.yellow)} ${colorize(`score ${candidate.score}`, ANSI.dim)}`,
+      );
+    }
+
+    return;
+  }
+
   console.log('    candidates:');
 
   for (const candidate of match.candidates) {
@@ -107,19 +167,13 @@ function printAmbiguousMatch(
   }
 }
 
-function printNoCandidateMatch(
-  index: number,
-  match: NoCandidateMatch,
-): void {
+function printNoCandidateMatch(index: number, match: NoCandidateMatch): void {
   printIssueHeader(index, match);
   printBaseIssueDetails(match);
   console.log(`    detected type: ${formatDetectedType(match)}`);
 }
 
-function printUnsupportedMatch(
-  index: number,
-  match: UnsupportedMatch,
-): void {
+function printUnsupportedMatch(index: number, match: UnsupportedMatch): void {
   printIssueHeader(index, match);
   printBaseIssueDetails(match);
   console.log(`    detected type: ${formatDetectedType(match)}`);
@@ -157,10 +211,10 @@ export function printClassifiedReport({
   classifiedIssues,
 }: ClassifiedReportInput): void {
   const totalIssues =
-    classifiedIssues.deterministic.length
-    + classifiedIssues.ambiguous.length
-    + classifiedIssues.noCandidate.length
-    + classifiedIssues.unsupported.length;
+    classifiedIssues.deterministic.length +
+    classifiedIssues.ambiguous.length +
+    classifiedIssues.noCandidate.length +
+    classifiedIssues.unsupported.length;
 
   console.log(bold(`Scan summary for ${targetPath}`));
   console.log('');
@@ -170,7 +224,7 @@ export function printClassifiedReport({
   console.log('');
   console.log(bold('Classification'));
   console.log(
-    `${colorize('- deterministic', ANSI.green)}: ${classifiedIssues.deterministic.length}  ${colorize('→ exactly one token candidate', ANSI.dim)}`,
+    `${colorize('- deterministic', ANSI.green)}: ${classifiedIssues.deterministic.length}  ${colorize('→ single exact token candidate', ANSI.dim)}`,
   );
   console.log(
     `${colorize('- ambiguous', ANSI.yellow)}: ${classifiedIssues.ambiguous.length}      ${colorize('→ multiple token candidates', ANSI.dim)}`,
@@ -188,7 +242,7 @@ export function printClassifiedReport({
   if (classifiedIssues.deterministic.length > 0) {
     printSectionHeader(
       'Deterministic matches',
-      'These values have exactly one matching token.',
+      'These values have a single exact token candidate.',
       ANSI.green,
     );
 

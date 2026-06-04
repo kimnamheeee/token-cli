@@ -88,7 +88,10 @@ test('findExactMatchingTokens filters by normalized value and token group', () =
 
   const matches = findExactMatchingTokens(createDetectedValue(), tokens);
 
-  assert.deepEqual(matches.map((match) => match.id), ['semantic.color.text.primary']);
+  assert.deepEqual(
+    matches.map((match) => match.id),
+    ['semantic.color.text.primary'],
+  );
 });
 
 test('matchTokens returns only deterministic exact matches', () => {
@@ -163,7 +166,10 @@ test('classifyIssues splits values into deterministic, ambiguous, no-candidate, 
   );
 
   assert.equal(classified.unsupported.length, 1);
-  assert.match(classified.unsupported[0]?.reason ?? '', /radius token category/i);
+  assert.match(
+    classified.unsupported[0]?.reason ?? '',
+    /radius token category/i,
+  );
 });
 
 test('rankTokenCandidates prioritizes property role matches over raw primitive tokens', () => {
@@ -179,7 +185,10 @@ test('rankTokenCandidates prioritizes property role matches over raw primitive t
     }),
   ];
 
-  const rankedCandidates = rankTokenCandidates(createDetectedValue(), candidates);
+  const rankedCandidates = rankTokenCandidates(
+    createDetectedValue(),
+    candidates,
+  );
 
   assert.deepEqual(
     rankedCandidates.map((candidate) => candidate.id),
@@ -189,8 +198,13 @@ test('rankTokenCandidates prioritizes property role matches over raw primitive t
       'primitive.color.slate900',
     ],
   );
-  assert.ok(rankedCandidates[0]?.score ?? 0 > (rankedCandidates[1]?.score ?? 0));
-  assert.match(rankedCandidates[0]?.reasons.join(' ') ?? '', /color role keyword/i);
+  assert.ok(
+    rankedCandidates[0]?.score ?? 0 > (rankedCandidates[1]?.score ?? 0),
+  );
+  assert.match(
+    rankedCandidates[0]?.reasons.join(' ') ?? '',
+    /color role keyword/i,
+  );
 });
 
 test('rankTokenCandidates uses component context without making component tokens globally preferred', () => {
@@ -231,6 +245,7 @@ test('rankTokenCandidates uses component context without making component tokens
   );
 
   assert.equal(unrelatedRanking[0]?.id, 'semantic.color.surface.default');
+  assert.match(unrelatedRanking[1]?.reasons.join(' ') ?? '', /does not match/);
 });
 
 test('classifyIssues attaches ranked candidates without changing ambiguous classification', () => {
@@ -252,9 +267,6 @@ test('classifyIssues attaches ranked candidates without changing ambiguous class
   ]);
   assert.deepEqual(
     classified.ambiguous[0]?.rankedCandidates?.map((candidate) => candidate.id),
-    [
-      'semantic.color.text.primary',
-      'primitive.color.slate900',
-    ],
+    ['semantic.color.text.primary', 'primitive.color.slate900'],
   );
 });
