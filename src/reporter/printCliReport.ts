@@ -16,6 +16,7 @@ interface DetectionReportInput {
   targetPath: string;
   blockCount: number;
   detectedValues: DetectedHardcodedValue[];
+  scanErrors?: ScanError[];
 }
 
 interface ClassifiedReportInput extends DetectionReportInput {
@@ -23,6 +24,11 @@ interface ClassifiedReportInput extends DetectionReportInput {
   mode?: 'summary' | 'detailed';
   limit?: number;
   explain?: boolean;
+}
+
+interface ScanError {
+  file: string;
+  message: string;
 }
 
 const ANSI = {
@@ -160,6 +166,24 @@ function printClassificationCounts(
   console.log(
     `${colorize('- unsupported', ANSI.magenta)}: ${classifiedIssues.unsupported.length}   ${colorize('-> detected, but not handled by current token rules', ANSI.dim)}`,
   );
+  console.log('');
+}
+
+function printScanErrors(scanErrors: ScanError[] | undefined): void {
+  if (!scanErrors || scanErrors.length === 0) {
+    return;
+  }
+
+  printSectionHeader(
+    'Scan errors',
+    'These files could not be parsed, but the rest of the scan completed.',
+    ANSI.magenta,
+  );
+
+  for (const scanError of scanErrors) {
+    console.log(`    - ${scanError.file}: ${scanError.message}`);
+  }
+
   console.log('');
 }
 
@@ -453,6 +477,7 @@ export function printDetectionReport({
   targetPath,
   blockCount,
   detectedValues,
+  scanErrors,
 }: DetectionReportInput): void {
   console.log(bold(`Scan summary for ${targetPath}`));
   console.log('');
@@ -472,6 +497,8 @@ export function printDetectionReport({
     printBaseIssueDetails(detectedValue);
     console.log(`    detected type: ${formatDetectedType(detectedValue)}`);
   });
+
+  printScanErrors(scanErrors);
 }
 
 export function printClassifiedReport({
@@ -482,6 +509,7 @@ export function printClassifiedReport({
   mode = 'summary',
   limit = 10,
   explain = false,
+  scanErrors,
 }: ClassifiedReportInput): void {
   console.log(bold(`Scan summary for ${targetPath}`));
   console.log('');
@@ -490,6 +518,7 @@ export function printClassifiedReport({
   );
   console.log('');
   printClassificationCounts(classifiedIssues);
+  printScanErrors(scanErrors);
 
   if (mode === 'detailed') {
     printDetailedMode(classifiedIssues);

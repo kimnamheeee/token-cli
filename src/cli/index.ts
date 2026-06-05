@@ -124,6 +124,8 @@ function main(): void {
           : undefined,
       limit,
       explain,
+      include: config.include,
+      exclude: config.exclude,
     });
     process.exitCode = 0;
     return;

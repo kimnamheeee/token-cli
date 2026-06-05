@@ -53,12 +53,19 @@ interface DetectionJsonReportInput {
   targetPath: string;
   detectedValues: DetectedHardcodedValue[];
   outputPath: string;
+  scanErrors?: ScanError[];
 }
 
 interface ClassifiedJsonReportInput {
   targetPath: string;
   classifiedIssues: ClassifiedIssueSets;
   outputPath: string;
+  scanErrors?: ScanError[];
+}
+
+interface ScanError {
+  file: string;
+  message: string;
 }
 
 function toBaseIssue(
@@ -85,6 +92,7 @@ export function exportDetectionJsonReport({
   targetPath,
   detectedValues,
   outputPath,
+  scanErrors = [],
 }: DetectionJsonReportInput): string {
   const issues: StructuredIssue[] = detectedValues.map((detectedValue) => ({
     ...toBaseIssue(detectedValue),
@@ -93,6 +101,7 @@ export function exportDetectionJsonReport({
 
   return writeJsonReport(outputPath, {
     target: targetPath,
+    scanErrors,
     issues,
   });
 }
@@ -101,6 +110,7 @@ export function exportClassifiedJsonReport({
   targetPath,
   classifiedIssues,
   outputPath,
+  scanErrors = [],
 }: ClassifiedJsonReportInput): string {
   const deterministic: StructuredIssue[] = classifiedIssues.deterministic.map(
     (issue) => ({
@@ -155,6 +165,7 @@ export function exportClassifiedJsonReport({
 
   return writeJsonReport(outputPath, {
     target: targetPath,
+    scanErrors,
     summary: {
       totalIssues: summary.totalIssues,
       cases: summary.cases,

@@ -10,6 +10,13 @@ import {
   printDetectionReport,
 } from '../reporter/printCliReport.js';
 import { loadTokens } from '../tokens/loadTokens.js';
+import type { InlineStyleBlock } from '../types/index.js';
+import { discoverTargetFiles } from './discoverTargetFiles.js';
+
+export interface ScanError {
+  file: string;
+  message: string;
+}
 
 export interface ScanOptions {
   tokenPath?: string;
@@ -18,15 +25,46 @@ export interface ScanOptions {
   reportMode?: 'summary' | 'detailed';
   limit?: number;
   explain?: boolean;
+  include?: string[];
+  exclude?: string[];
 }
 
 export function scan(targetPath: string, options: ScanOptions = {}): void {
-  const { tokenPath, format, outputPath, reportMode, limit, explain } = options;
-  const blocks = extractInlineStylesFromFile(targetPath);
+  const {
+    tokenPath,
+    format,
+    outputPath,
+    reportMode,
+    limit,
+    explain,
+    include,
+    exclude,
+  } = options;
+  const targetFiles = discoverTargetFiles(targetPath, { include, exclude });
+  const blocks: InlineStyleBlock[] = [];
+  const scanErrors: ScanError[] = [];
+
+  for (const filePath of targetFiles) {
+    try {
+      blocks.push(...extractInlineStylesFromFile(filePath));
+    } catch (error) {
+      scanErrors.push({
+        file: filePath,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const detectedValues = detectHardcodedValues(blocks);
+
+  if (targetFiles.length === 0) {
+    console.log(`No matching source files found in ${targetPath}`);
+    return;
+  }
 
   if (blocks.length === 0) {
     console.log(`No inline style literals found in ${targetPath}`);
+    printScanErrors(scanErrors);
     return;
   }
 
@@ -34,6 +72,7 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
     console.log(
       `No supported hardcoded color or spacing values found in ${targetPath}`,
     );
+    printScanErrors(scanErrors);
     return;
   }
 
@@ -61,6 +100,7 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
       mode: reportMode,
       limit,
       explain,
+      scanErrors,
     });
 
     if (format === 'json' && outputPath) {
@@ -68,6 +108,7 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
         targetPath,
         classifiedIssues,
         outputPath,
+        scanErrors,
       });
 
       console.log('');
@@ -81,6 +122,7 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
     targetPath,
     blockCount: blocks.length,
     detectedValues,
+    scanErrors,
   });
 
   if (format === 'json' && outputPath) {
@@ -88,9 +130,23 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
       targetPath,
       detectedValues,
       outputPath,
+      scanErrors,
     });
 
     console.log('');
     console.log(`Structured JSON report written to ${resolvedOutputPath}`);
+  }
+}
+
+function printScanErrors(scanErrors: ScanError[]): void {
+  if (scanErrors.length === 0) {
+    return;
+  }
+
+  console.log('');
+  console.log(`Encountered ${scanErrors.length} file scan error(s):`);
+
+  for (const scanError of scanErrors) {
+    console.log(`- ${scanError.file}: ${scanError.message}`);
   }
 }
