@@ -98,9 +98,22 @@ export interface AmbiguousTokenMatch extends DetectedHardcodedValue {
   reason: string;
 }
 
+export type NoCandidateSuggestedAction =
+  | 'reuse-existing-token'
+  | 'define-semantic-token'
+  | 'define-component-token'
+  | 'review-value';
+
+export interface NoCandidateDiagnostics {
+  tokenGroup: SupportedTokenGroup;
+  suggestedAction: NoCandidateSuggestedAction;
+  nearbyCandidates?: RankedTokenCandidate[];
+}
+
 export interface NoCandidateMatch extends DetectedHardcodedValue {
   case: 'no-candidate';
   reason: string;
+  diagnostics?: NoCandidateDiagnostics;
 }
 
 export interface UnsupportedMatch extends DetectedHardcodedValue {

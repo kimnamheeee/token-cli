@@ -4,6 +4,7 @@ import path from 'node:path';
 import type {
   ClassifiedIssueSets,
   DetectedHardcodedValue,
+  NoCandidateDiagnostics,
   RankedTokenCandidate,
 } from '../types/index.js';
 import { buildClassifiedReportSummary } from './buildReportSummary.js';
@@ -34,6 +35,7 @@ interface AmbiguousStructuredIssue extends BaseStructuredIssue {
 
 interface NoCandidateStructuredIssue extends BaseStructuredIssue {
   case: 'no-candidate';
+  diagnostics?: NoCandidateDiagnostics;
 }
 
 interface UnsupportedStructuredIssue extends BaseStructuredIssue {
@@ -121,6 +123,7 @@ export function exportClassifiedJsonReport({
     (issue) => ({
       ...toBaseIssue(issue),
       case: 'no-candidate',
+      diagnostics: issue.diagnostics,
     }),
   );
 

@@ -2,6 +2,7 @@ import type {
   AmbiguousTokenMatch,
   ClassifiedIssueSets,
   DetectedHardcodedValue,
+  NoCandidateDiagnostics,
   RankedTokenCandidate,
 } from '../types/index.js';
 
@@ -34,6 +35,7 @@ export interface ReportDecision {
   confidence?: RecommendationConfidence;
   scoreGap?: number;
   missingContext?: string[];
+  diagnostics?: NoCandidateDiagnostics;
 }
 
 function toDecisionBase(detectedValue: DetectedHardcodedValue) {
@@ -219,7 +221,8 @@ export function buildReportDecisions(
       decision: 'unknown',
       severity: 'unknown',
       message: 'no exact token candidate found',
-      topCandidates: [],
+      topCandidates: issue.diagnostics?.nearbyCandidates ?? [],
+      diagnostics: issue.diagnostics,
       missingContext: ['token definition or corrected design-system value'],
     }),
   );

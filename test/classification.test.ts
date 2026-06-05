@@ -6,6 +6,7 @@ import {
   findExactMatchingTokens,
   matchTokens,
 } from '../src/matcher/matchTokens.js';
+import { findNearbyTokenCandidates } from '../src/matcher/findNearbyTokenCandidates.js';
 import { rankTokenCandidates } from '../src/matcher/rankTokenCandidates.js';
 import type {
   DetectedHardcodedValue,
@@ -268,5 +269,75 @@ test('classifyIssues attaches ranked candidates without changing ambiguous class
   assert.deepEqual(
     classified.ambiguous[0]?.rankedCandidates?.map((candidate) => candidate.id),
     ['semantic.color.text.primary', 'primitive.color.slate900'],
+  );
+});
+
+test('findNearbyTokenCandidates returns nearby scale and hex candidates without exact replacement', () => {
+  const spacingCandidates = [
+    createRecord('semantic.spacing.sm', '12', 'spacing'),
+    createRecord('semantic.spacing.md', '16', 'spacing'),
+    createRecord('semantic.spacing.lg', '24', 'spacing'),
+  ];
+
+  const nearbySpacing = findNearbyTokenCandidates(
+    createDetectedValue({
+      property: 'padding',
+      rawValue: '14',
+      normalizedValue: '14',
+      valueType: 'number',
+      tokenGroup: 'spacing',
+    }),
+    spacingCandidates,
+  );
+
+  assert.deepEqual(
+    nearbySpacing.map((candidate) => candidate.id),
+    ['semantic.spacing.md', 'semantic.spacing.sm', 'semantic.spacing.lg'],
+  );
+  assert.match(nearbySpacing[0]?.reasons.join(' ') ?? '', /nearby candidate/i);
+
+  const nearbyColors = findNearbyTokenCandidates(
+    createDetectedValue({
+      rawValue: '#fffffe',
+      normalizedValue: '#fffffe',
+    }),
+    [
+      createRecord('semantic.color.surface.default', '#ffffff', 'color'),
+      createRecord('semantic.color.text.default', '#111827', 'color'),
+    ],
+  );
+
+  assert.equal(nearbyColors[0]?.id, 'semantic.color.surface.default');
+});
+
+test('classifyIssues attaches no-candidate diagnostics with nearby candidates', () => {
+  const tokens = createLoadedTokens([
+    createRecord('semantic.spacing.sm', '12', 'spacing'),
+    createRecord('semantic.spacing.md', '16', 'spacing'),
+  ]);
+
+  const classified = classifyIssues(
+    [
+      createDetectedValue({
+        property: 'padding',
+        rawValue: '14',
+        normalizedValue: '14',
+        valueType: 'number',
+        tokenGroup: 'spacing',
+      }),
+    ],
+    tokens,
+  );
+
+  assert.equal(classified.noCandidate.length, 1);
+  assert.equal(
+    classified.noCandidate[0]?.diagnostics?.suggestedAction,
+    'review-value',
+  );
+  assert.deepEqual(
+    classified.noCandidate[0]?.diagnostics?.nearbyCandidates?.map(
+      (candidate) => candidate.id,
+    ),
+    ['semantic.spacing.md', 'semantic.spacing.sm'],
   );
 });

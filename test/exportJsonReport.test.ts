@@ -77,6 +77,16 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
     normalizedValue: '#ff0000',
     tokenGroup: 'color',
   });
+  const noCandidate = createDetectedValue({
+    filePath: 'src/C.tsx',
+    line: 30,
+    column: 4,
+    property: 'padding',
+    rawValue: '14',
+    normalizedValue: '14',
+    valueType: 'number',
+    tokenGroup: 'spacing',
+  });
 
   const classifiedIssues: ClassifiedIssueSets = {
     deterministic: [
@@ -110,7 +120,27 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
         reason: 'multiple token candidates were found',
       },
     ],
-    noCandidate: [],
+    noCandidate: [
+      {
+        ...noCandidate,
+        case: 'no-candidate',
+        reason: 'no token with the same normalized value was found',
+        diagnostics: {
+          tokenGroup: 'spacing',
+          suggestedAction: 'review-value',
+          nearbyCandidates: [
+            {
+              id: 'semantic.spacing.md',
+              score: 98,
+              reasons: [
+                'spacing scale is 2 away from 16',
+                'nearby candidate only; not an exact replacement',
+              ],
+            },
+          ],
+        },
+      },
+    ],
     unsupported: [],
   };
 
@@ -122,13 +152,13 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
 
   const report = readJson(resolvedPath);
 
-  assert.equal(report.issues.length, 2);
-  assert.equal(report.details.length, 2);
-  assert.equal(report.summary.totalIssues, 2);
+  assert.equal(report.issues.length, 3);
+  assert.equal(report.details.length, 3);
+  assert.equal(report.summary.totalIssues, 3);
   assert.deepEqual(report.summary.cases, {
     deterministic: 1,
     ambiguous: 1,
-    'no-candidate': 0,
+    'no-candidate': 1,
     unsupported: 0,
   });
   assert.deepEqual(report.summary.confidence, {
@@ -139,14 +169,14 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
   assert.deepEqual(report.summary.decisions, {
     'safe-replacement': 2,
     ambiguous: 0,
-    unknown: 0,
+    unknown: 1,
     unsupported: 0,
   });
   assert.deepEqual(report.summary.severity, {
     error: 2,
     warning: 0,
     info: 0,
-    unknown: 0,
+    unknown: 1,
   });
   assert.deepEqual(report.hotspots.files, [
     {
@@ -157,9 +187,13 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
       value: 'src/B.tsx',
       count: 1,
     },
+    {
+      value: 'src/C.tsx',
+      count: 1,
+    },
   ]);
   assert.equal(report.recommendations[0].token, 'semantic.color.text.primary');
-  assert.equal(report.decisions.length, 2);
+  assert.equal(report.decisions.length, 3);
   assert.equal(report.decisions[0].decision, 'safe-replacement');
   assert.equal(report.decisions[0].severity, 'error');
   assert.deepEqual(
@@ -188,5 +222,11 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
   ]);
   assert.equal(report.issues[1].token, 'semantic.spacing.md');
   assert.equal(report.issues[1].value, '8');
+  assert.equal(report.issues[2].case, 'no-candidate');
+  assert.equal(report.issues[2].diagnostics.suggestedAction, 'review-value');
+  assert.equal(
+    report.issues[2].diagnostics.nearbyCandidates[0].id,
+    'semantic.spacing.md',
+  );
   assert.equal(report.token_source, undefined);
 });

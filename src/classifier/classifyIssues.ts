@@ -1,3 +1,6 @@
+import path from 'node:path';
+
+import { findNearbyTokenCandidates } from '../matcher/findNearbyTokenCandidates.js';
 import { findExactMatchingTokens } from '../matcher/matchTokens.js';
 import { rankTokenCandidates } from '../matcher/rankTokenCandidates.js';
 import type {
@@ -7,6 +10,8 @@ import type {
   DeterministicTokenMatch,
   LoadedTokens,
   NoCandidateMatch,
+  NoCandidateSuggestedAction,
+  RankedTokenCandidate,
   TokenRecord,
   UnsupportedMatch,
 } from '../types/index.js';
@@ -38,12 +43,49 @@ function toAmbiguousMatch(
 
 function toNoCandidateMatch(
   detectedValue: DetectedHardcodedValue,
+  nearbyCandidates: RankedTokenCandidate[],
 ): NoCandidateMatch {
   return {
     ...detectedValue,
     case: 'no-candidate',
     reason: 'no token with the same normalized value was found',
+    diagnostics: {
+      tokenGroup: detectedValue.tokenGroup,
+      suggestedAction: getNoCandidateSuggestedAction(
+        detectedValue,
+        nearbyCandidates,
+      ),
+      ...(nearbyCandidates.length > 0 ? { nearbyCandidates } : {}),
+    },
   };
+}
+
+function getNoCandidateSuggestedAction(
+  detectedValue: DetectedHardcodedValue,
+  nearbyCandidates: RankedTokenCandidate[],
+): NoCandidateSuggestedAction {
+  if (nearbyCandidates.length > 0) {
+    return 'review-value';
+  }
+
+  if (hasComponentContext(detectedValue)) {
+    return 'define-component-token';
+  }
+
+  if (detectedValue.tokenGroup === 'color') {
+    return 'define-semantic-token';
+  }
+
+  return 'review-value';
+}
+
+function hasComponentContext(detectedValue: DetectedHardcodedValue): boolean {
+  const fileBaseName = path.basename(
+    detectedValue.filePath,
+    path.extname(detectedValue.filePath),
+  );
+
+  return /^[A-Z]/.test(fileBaseName);
 }
 
 function toUnsupportedMatch(
@@ -91,7 +133,12 @@ export function classifyIssues(
       continue;
     }
 
-    noCandidate.push(toNoCandidateMatch(detectedValue));
+    noCandidate.push(
+      toNoCandidateMatch(
+        detectedValue,
+        findNearbyTokenCandidates(detectedValue, tokens.records),
+      ),
+    );
   }
 
   return {

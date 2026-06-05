@@ -115,6 +115,11 @@ function buildRecommendations(
   decisions: ReportDecision[],
 ): ReportRecommendation[] {
   return decisions
+    .filter(
+      (decision) =>
+        decision.decision === 'safe-replacement' ||
+        decision.decision === 'ambiguous',
+    )
     .flatMap((decision): ReportRecommendation[] => {
       const [topCandidate] = decision.topCandidates;
 

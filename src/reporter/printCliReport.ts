@@ -311,13 +311,23 @@ function printReportDecision(
       `    replace with: ${colorize(topCandidate.id, ANSI.bold, ANSI.green)}${formatDecisionScore(decision)}`,
     );
   } else if (visibleCandidates.length > 0) {
-    console.log('    candidates:');
+    console.log(
+      decision.decision === 'unknown'
+        ? '    nearby candidates:'
+        : '    candidates:',
+    );
 
     for (const candidate of visibleCandidates) {
       console.log(
         `      - ${colorize(candidate.id, ANSI.bold, ANSI.yellow)} ${colorize(`score ${candidate.score}`, ANSI.dim)}`,
       );
     }
+  }
+
+  if (decision.diagnostics) {
+    console.log(
+      `    suggested action: ${decision.diagnostics.suggestedAction}`,
+    );
   }
 
   if (decision.missingContext && decision.missingContext.length > 0) {
