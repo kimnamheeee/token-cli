@@ -1,8 +1,9 @@
 import { loadConfig } from '../config/loadConfig.js';
 import { scan } from './scan.js';
+import { setup } from './setup.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator setup --config <path> --force';
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
   const flagIndex = args.indexOf(flagName);
@@ -34,6 +35,22 @@ function hasFlag(args: string[], flagName: string): boolean {
 
 function main(): void {
   const [, , command, targetPath, ...restArgs] = process.argv;
+
+  if (command === 'setup') {
+    const setupArgs = targetPath ? [targetPath, ...restArgs] : restArgs;
+    const configPath = getFlagValue(setupArgs, '--config');
+    const force = hasFlag(setupArgs, '--force');
+
+    setup({ configPath, force })
+      .then(() => {
+        process.exitCode = 0;
+      })
+      .catch((error: unknown) => {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+      });
+    return;
+  }
 
   if (command === 'scan') {
     if (!targetPath) {

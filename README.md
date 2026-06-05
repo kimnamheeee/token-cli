@@ -22,6 +22,13 @@ token-validator scan ./src/Button.tsx --config ./token-validator.config.json
 
 CLI options override config values.
 
+Create a config interactively:
+
+```bash
+token-validator setup
+token-validator setup --config ./token-validator.config.json --force
+```
+
 ```json
 {
   "tokens": "samples/tokens/storefront.tokens.ts",
