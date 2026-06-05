@@ -1,10 +1,15 @@
 import type {
-  AmbiguousTokenMatch,
   ClassifiedIssueSets,
   DetectedHardcodedValue,
 } from '../types/index.js';
+import {
+  buildReportDecisions,
+  type RecommendationConfidence,
+  type ReportDecision,
+  type ReportDecisionType,
+  type ReportSeverity,
+} from './buildReportDecisions.js';
 
-export type RecommendationConfidence = 'high' | 'medium' | 'low';
 type ClassifiedCase =
   | 'deterministic'
   | 'ambiguous'
@@ -22,6 +27,8 @@ export interface ReportRecommendation {
   column: number;
   property: string;
   value: string;
+  decision: ReportDecisionType;
+  severity: ReportSeverity;
   token: string;
   score: number;
   scoreGap: number;
@@ -33,11 +40,14 @@ export interface ClassifiedReportSummary {
   totalIssues: number;
   cases: Record<ClassifiedCase, number>;
   confidence: Record<RecommendationConfidence, number>;
+  decisions: Record<ReportDecisionType, number>;
+  severity: Record<ReportSeverity, number>;
   hotspots: {
     files: ReportCount[];
     values: ReportCount[];
   };
   recommendations: ReportRecommendation[];
+  reportDecisions: ReportDecision[];
 }
 
 interface BuildSummaryOptions {
@@ -73,37 +83,6 @@ function getAllClassifiedIssues(
   ];
 }
 
-export function getRecommendationConfidence(
-  match: AmbiguousTokenMatch,
-): RecommendationConfidence {
-  const [topCandidate, nextCandidate] = match.rankedCandidates ?? [];
-
-  if (!topCandidate || !nextCandidate) {
-    return 'low';
-  }
-
-  const hasStrongReason = topCandidate.reasons.some(
-    (reason) =>
-      reason.includes('role keyword') || reason.includes('file context'),
-  );
-
-  if (!hasStrongReason) {
-    return 'low';
-  }
-
-  const scoreGap = topCandidate.score - nextCandidate.score;
-
-  if (scoreGap >= 20) {
-    return 'high';
-  }
-
-  if (scoreGap >= 10) {
-    return 'medium';
-  }
-
-  return 'low';
-}
-
 function getConfidenceRank(confidence: RecommendationConfidence): number {
   if (confidence === 'high') {
     return 3;
@@ -116,37 +95,58 @@ function getConfidenceRank(confidence: RecommendationConfidence): number {
   return 1;
 }
 
+function getDecisionRank(decision: ReportDecisionType): number {
+  if (decision === 'safe-replacement') {
+    return 4;
+  }
+
+  if (decision === 'ambiguous') {
+    return 3;
+  }
+
+  if (decision === 'unknown') {
+    return 2;
+  }
+
+  return 1;
+}
+
 function buildRecommendations(
-  ambiguousIssues: AmbiguousTokenMatch[],
+  decisions: ReportDecision[],
 ): ReportRecommendation[] {
-  return ambiguousIssues
-    .flatMap((issue): ReportRecommendation[] => {
-      const [topCandidate, nextCandidate] = issue.rankedCandidates ?? [];
+  return decisions
+    .flatMap((decision): ReportRecommendation[] => {
+      const [topCandidate] = decision.topCandidates;
 
       if (!topCandidate) {
         return [];
       }
 
-      const scoreGap = nextCandidate
-        ? topCandidate.score - nextCandidate.score
-        : 0;
-
       return [
         {
-          file: issue.filePath,
-          line: issue.line,
-          column: issue.column,
-          property: issue.property,
-          value: issue.rawValue,
+          file: decision.file,
+          line: decision.line,
+          column: decision.column,
+          property: decision.property,
+          value: decision.value,
+          decision: decision.decision,
+          severity: decision.severity,
           token: topCandidate.id,
           score: topCandidate.score,
-          scoreGap,
-          confidence: getRecommendationConfidence(issue),
+          scoreGap: decision.scoreGap ?? 0,
+          confidence: decision.confidence ?? 'low',
           reasons: topCandidate.reasons,
         },
       ];
     })
     .sort((left, right) => {
+      const decisionDiff =
+        getDecisionRank(right.decision) - getDecisionRank(left.decision);
+
+      if (decisionDiff !== 0) {
+        return decisionDiff;
+      }
+
       const confidenceDiff =
         getConfidenceRank(right.confidence) -
         getConfidenceRank(left.confidence);
@@ -182,13 +182,26 @@ export function buildClassifiedReportSummary(
   const hotspotLimit = options.hotspotLimit ?? 5;
   const recommendationLimit = options.recommendationLimit ?? 10;
   const allIssues = getAllClassifiedIssues(classifiedIssues);
+  const reportDecisions = buildReportDecisions(classifiedIssues);
   const fileCounts = new Map<string, number>();
   const valueCounts = new Map<string, number>();
-  const allRecommendations = buildRecommendations(classifiedIssues.ambiguous);
+  const allRecommendations = buildRecommendations(reportDecisions);
   const confidence: Record<RecommendationConfidence, number> = {
     high: 0,
     medium: 0,
     low: 0,
+  };
+  const decisions: Record<ReportDecisionType, number> = {
+    'safe-replacement': 0,
+    ambiguous: 0,
+    unknown: 0,
+    unsupported: 0,
+  };
+  const severity: Record<ReportSeverity, number> = {
+    error: 0,
+    warning: 0,
+    info: 0,
+    unknown: 0,
   };
 
   for (const issue of allIssues) {
@@ -196,8 +209,13 @@ export function buildClassifiedReportSummary(
     incrementCount(valueCounts, issue.rawValue);
   }
 
-  for (const recommendation of allRecommendations) {
-    confidence[recommendation.confidence] += 1;
+  for (const decision of reportDecisions) {
+    decisions[decision.decision] += 1;
+    severity[decision.severity] += 1;
+
+    if (decision.sourceCase === 'ambiguous' && decision.confidence) {
+      confidence[decision.confidence] += 1;
+    }
   }
 
   return {
@@ -209,10 +227,13 @@ export function buildClassifiedReportSummary(
       unsupported: classifiedIssues.unsupported.length,
     },
     confidence,
+    decisions,
+    severity,
     hotspots: {
       files: sortCounts(fileCounts, hotspotLimit),
       values: sortCounts(valueCounts, hotspotLimit),
     },
     recommendations: allRecommendations.slice(0, recommendationLimit),
+    reportDecisions,
   };
 }

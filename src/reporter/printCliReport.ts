@@ -7,9 +7,10 @@ import type {
   UnsupportedMatch,
 } from '../types/index.js';
 import {
-  buildClassifiedReportSummary,
   getRecommendationConfidence,
-} from './buildReportSummary.js';
+  type ReportDecision,
+} from './buildReportDecisions.js';
+import { buildClassifiedReportSummary } from './buildReportSummary.js';
 
 interface DetectionReportInput {
   targetPath: string;
@@ -21,6 +22,7 @@ interface ClassifiedReportInput extends DetectionReportInput {
   classifiedIssues: ClassifiedIssueSets;
   mode?: 'summary' | 'detailed';
   limit?: number;
+  explain?: boolean;
 }
 
 const ANSI = {
@@ -164,6 +166,7 @@ function printClassificationCounts(
 function printSummaryMode(
   classifiedIssues: ClassifiedIssueSets,
   limit: number,
+  explain: boolean,
 ): void {
   const summary = buildClassifiedReportSummary(classifiedIssues, {
     recommendationLimit: limit,
@@ -177,6 +180,15 @@ function printSummaryMode(
   console.log(bold('Recommendation confidence'));
   console.log(
     `${colorize('- high', ANSI.green)}: ${summary.confidence.high}  ${colorize('- medium', ANSI.yellow)}: ${summary.confidence.medium}  ${colorize('- low', ANSI.gray)}: ${summary.confidence.low}`,
+  );
+  console.log('');
+
+  console.log(bold('Decision summary'));
+  console.log(
+    `${colorize('- safe', ANSI.green)}: ${summary.decisions['safe-replacement']}  ${colorize('- ambiguous', ANSI.yellow)}: ${summary.decisions.ambiguous}  ${colorize('- unknown', ANSI.red)}: ${summary.decisions.unknown}  ${colorize('- unsupported', ANSI.magenta)}: ${summary.decisions.unsupported}`,
+  );
+  console.log(
+    `${colorize('- error', ANSI.red)}: ${summary.severity.error}  ${colorize('- warning', ANSI.yellow)}: ${summary.severity.warning}  ${colorize('- info', ANSI.gray)}: ${summary.severity.info}  ${colorize('- unknown', ANSI.magenta)}: ${summary.severity.unknown}`,
   );
   console.log('');
 
@@ -208,41 +220,138 @@ function printSummaryMode(
     console.log('');
   }
 
-  if (summary.recommendations.length > 0) {
+  const safeDecisions = summary.reportDecisions
+    .filter((decision) => decision.decision === 'safe-replacement')
+    .slice(0, limit);
+  const ambiguousDecisions = summary.reportDecisions
+    .filter((decision) => decision.decision === 'ambiguous')
+    .slice(0, limit);
+  const unknownDecisions = summary.reportDecisions
+    .filter((decision) => decision.decision === 'unknown')
+    .slice(0, limit);
+
+  if (safeDecisions.length > 0) {
     printSectionHeader(
-      'Top recommendations',
-      `Showing up to ${limit} ambiguous issue(s) with ranked token candidates.`,
-      ANSI.yellow,
+      'Safe replacements',
+      `Showing up to ${limit} high-confidence replacement(s).`,
+      ANSI.green,
     );
 
-    summary.recommendations.forEach((recommendation, index) => {
-      console.log(
-        colorize(
-          `[${index + 1}] ${recommendation.file}:${recommendation.line}:${recommendation.column}`,
-          ANSI.bold,
-        ),
-      );
-      console.log(`    property: ${recommendation.property}`);
-      console.log(`    raw value: ${JSON.stringify(recommendation.value)}`);
-      console.log(
-        `    token: ${colorize(recommendation.token, ANSI.bold, ANSI.yellow)} ${colorize(`(score ${recommendation.score}, gap ${recommendation.scoreGap}, ${recommendation.confidence} confidence)`, ANSI.dim)}`,
-      );
-      console.log('    reasons:');
-
-      for (const reason of recommendation.reasons) {
-        console.log(`      - ${reason}`);
-      }
+    safeDecisions.forEach((decision, index) => {
+      printReportDecision(index + 1, decision, explain);
     });
 
     console.log('');
-    return;
   }
+
+  if (ambiguousDecisions.length > 0) {
+    printSectionHeader(
+      'Ambiguous',
+      `Showing up to ${limit} issue(s) that need semantic review.`,
+      ANSI.yellow,
+    );
+
+    ambiguousDecisions.forEach((decision, index) => {
+      printReportDecision(index + 1, decision, explain);
+    });
+
+    console.log('');
+  }
+
+  if (unknownDecisions.length > 0) {
+    printSectionHeader(
+      'Unknown',
+      `Showing up to ${limit} value(s) with no exact token candidate.`,
+      ANSI.red,
+    );
+
+    unknownDecisions.forEach((decision, index) => {
+      printReportDecision(index + 1, decision, explain);
+    });
+
+    console.log('');
+  }
+
+  if (
+    safeDecisions.length === 0 &&
+    ambiguousDecisions.length === 0 &&
+    unknownDecisions.length === 0
+  ) {
+    console.log(
+      colorize(
+        'No token replacement decisions. Use --report detailed for the full issue list.',
+        ANSI.gray,
+      ),
+    );
+  }
+}
+
+function printReportDecision(
+  index: number,
+  decision: ReportDecision,
+  explain: boolean,
+): void {
+  const [topCandidate] = decision.topCandidates;
+  const visibleCandidates = decision.topCandidates.slice(0, 3);
 
   console.log(
     colorize(
-      'No ranked ambiguous recommendations. Use --report detailed for the full issue list.',
-      ANSI.gray,
+      `[${index}] ${decision.file}:${decision.line}:${decision.column}`,
+      ANSI.bold,
     ),
+  );
+  console.log(`    property: ${decision.property}`);
+  console.log(`    raw value: ${JSON.stringify(decision.value)}`);
+  console.log(
+    `    decision: ${decision.decision} ${colorize(`(${decision.severity})`, ANSI.dim)}`,
+  );
+
+  if (topCandidate && decision.decision === 'safe-replacement') {
+    console.log(
+      `    replace with: ${colorize(topCandidate.id, ANSI.bold, ANSI.green)}${formatDecisionScore(decision)}`,
+    );
+  } else if (visibleCandidates.length > 0) {
+    console.log('    candidates:');
+
+    for (const candidate of visibleCandidates) {
+      console.log(
+        `      - ${colorize(candidate.id, ANSI.bold, ANSI.yellow)} ${colorize(`score ${candidate.score}`, ANSI.dim)}`,
+      );
+    }
+  }
+
+  if (decision.missingContext && decision.missingContext.length > 0) {
+    console.log(`    missing context: ${decision.missingContext.join(', ')}`);
+  }
+
+  const reasons = topCandidate?.reasons ?? [];
+  const visibleReasons = explain ? reasons : reasons.slice(0, 2);
+
+  if (visibleReasons.length > 0) {
+    console.log(explain ? '    reasons:' : '    reason:');
+
+    for (const reason of visibleReasons) {
+      console.log(`      - ${reason}`);
+    }
+  }
+}
+
+function formatDecisionScore(decision: ReportDecision): string {
+  const [topCandidate] = decision.topCandidates;
+
+  if (!topCandidate) {
+    return '';
+  }
+
+  const confidence = decision.confidence
+    ? `, ${decision.confidence} confidence`
+    : '';
+  const scoreGap =
+    typeof decision.scoreGap === 'number' ? `, gap ${decision.scoreGap}` : '';
+
+  return colorize(
+    ` (score ${topCandidate.score}${scoreGap}${confidence})`,
+    ANSI.dim,
   );
 }
 
@@ -362,6 +471,7 @@ export function printClassifiedReport({
   classifiedIssues,
   mode = 'summary',
   limit = 10,
+  explain = false,
 }: ClassifiedReportInput): void {
   console.log(bold(`Scan summary for ${targetPath}`));
   console.log('');
@@ -376,5 +486,5 @@ export function printClassifiedReport({
     return;
   }
 
-  printSummaryMode(classifiedIssues, limit);
+  printSummaryMode(classifiedIssues, limit, explain);
 }

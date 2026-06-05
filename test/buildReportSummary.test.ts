@@ -117,6 +117,18 @@ test('buildClassifiedReportSummary returns counts, hotspots, and prioritized rec
     medium: 0,
     low: 1,
   });
+  assert.deepEqual(summary.decisions, {
+    'safe-replacement': 2,
+    ambiguous: 1,
+    unknown: 1,
+    unsupported: 0,
+  });
+  assert.deepEqual(summary.severity, {
+    error: 2,
+    warning: 1,
+    info: 0,
+    unknown: 1,
+  });
   assert.deepEqual(summary.hotspots.files[0], {
     value: 'src/Button.tsx',
     count: 3,
@@ -130,7 +142,9 @@ test('buildClassifiedReportSummary returns counts, hotspots, and prioritized rec
     'semantic.color.text.primary',
   );
   assert.equal(summary.recommendations[0]?.confidence, 'high');
-  assert.equal(summary.recommendations[1]?.confidence, 'low');
+  assert.equal(summary.recommendations[1]?.token, 'semantic.spacing.md');
+  assert.equal(summary.recommendations[1]?.confidence, 'high');
+  assert.equal(summary.reportDecisions.length, 4);
 
   const limitedSummary = buildClassifiedReportSummary(classifiedIssues, {
     recommendationLimit: 1,

@@ -1,7 +1,7 @@
 import { scan } from './scan.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --tokens <path> --report summary|detailed --limit <n> --format json --out <path>';
+  'Usage: token-validator scan <target> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>';
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
   const flagIndex = args.indexOf(flagName);
@@ -27,6 +27,10 @@ function parseLimit(value: string | undefined): number | undefined {
   return parsedValue;
 }
 
+function hasFlag(args: string[], flagName: string): boolean {
+  return args.includes(flagName);
+}
+
 function main(): void {
   const [, , command, targetPath, ...restArgs] = process.argv;
 
@@ -43,6 +47,7 @@ function main(): void {
     const reportValue = getFlagValue(restArgs, '--report');
     const limitValue = getFlagValue(restArgs, '--limit');
     const limit = parseLimit(limitValue);
+    const explain = hasFlag(restArgs, '--explain');
 
     if (formatValue && formatValue !== 'json') {
       console.error(`Unsupported format: ${formatValue}`);
@@ -81,6 +86,7 @@ function main(): void {
           ? reportValue
           : undefined,
       limit,
+      explain,
     });
     process.exitCode = 0;
     return;

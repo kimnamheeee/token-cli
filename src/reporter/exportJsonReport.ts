@@ -156,9 +156,12 @@ export function exportClassifiedJsonReport({
       totalIssues: summary.totalIssues,
       cases: summary.cases,
       confidence: summary.confidence,
+      decisions: summary.decisions,
+      severity: summary.severity,
     },
     hotspots: summary.hotspots,
     recommendations: summary.recommendations,
+    decisions: summary.reportDecisions,
     details: issues,
     issues,
   });

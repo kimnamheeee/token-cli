@@ -136,6 +136,18 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
     medium: 0,
     low: 0,
   });
+  assert.deepEqual(report.summary.decisions, {
+    'safe-replacement': 2,
+    ambiguous: 0,
+    unknown: 0,
+    unsupported: 0,
+  });
+  assert.deepEqual(report.summary.severity, {
+    error: 2,
+    warning: 0,
+    info: 0,
+    unknown: 0,
+  });
   assert.deepEqual(report.hotspots.files, [
     {
       value: 'src/A.tsx',
@@ -147,6 +159,15 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
     },
   ]);
   assert.equal(report.recommendations[0].token, 'semantic.color.text.primary');
+  assert.equal(report.decisions.length, 2);
+  assert.equal(report.decisions[0].decision, 'safe-replacement');
+  assert.equal(report.decisions[0].severity, 'error');
+  assert.deepEqual(
+    report.decisions[0].topCandidates.map(
+      (candidate: { id: string }) => candidate.id,
+    ),
+    ['semantic.color.text.primary', 'semantic.color.icon.primary'],
+  );
   assert.equal(report.issues[0].file, 'src/A.tsx');
   assert.equal(report.issues[0].value, '#ff0000');
   assert.deepEqual(report.issues[0].candidates, [

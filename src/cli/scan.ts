@@ -17,10 +17,11 @@ export interface ScanOptions {
   outputPath?: string;
   reportMode?: 'summary' | 'detailed';
   limit?: number;
+  explain?: boolean;
 }
 
 export function scan(targetPath: string, options: ScanOptions = {}): void {
-  const { tokenPath, format, outputPath, reportMode, limit } = options;
+  const { tokenPath, format, outputPath, reportMode, limit, explain } = options;
   const blocks = extractInlineStylesFromFile(targetPath);
   const detectedValues = detectHardcodedValues(blocks);
 
@@ -59,6 +60,7 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
       classifiedIssues,
       mode: reportMode,
       limit,
+      explain,
     });
 
     if (format === 'json' && outputPath) {
