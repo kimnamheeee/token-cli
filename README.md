@@ -13,10 +13,31 @@ Project bootstrap for Phase 1 / Commit 1 is in place:
 - Initial token schema example and token loader utilities
 - Babel-based inline style extraction POC
 
-## Planned command
+## Scan command
 
 ```bash
-token-validator scan ./src --tokens ./tokens.json
+token-validator scan ./src/Button.tsx --tokens ./tokens.json
+token-validator scan ./src/Button.tsx --config ./token-validator.config.json
+```
+
+CLI options override config values.
+
+```json
+{
+  "tokens": "samples/tokens/storefront.tokens.ts",
+  "report": {
+    "mode": "summary",
+    "limit": 10,
+    "format": "json",
+    "out": "reports/token-report.json",
+    "explain": false
+  },
+  "sources": {
+    "design": "DESIGN.md",
+    "tokens": "src/tokens.ts"
+  },
+  "authority": "compare-only"
+}
 ```
 
 ## Current POC
@@ -24,5 +45,5 @@ token-validator scan ./src --tokens ./tokens.json
 After installing dependencies, you can inspect a sample file with:
 
 ```bash
-npm run dev -- scan samples/before/Button.tsx
+npm run dev -- scan samples/before/PromoBanner.tsx --tokens samples/tokens/storefront.tokens.ts
 ```

@@ -1,7 +1,8 @@
+import { loadConfig } from '../config/loadConfig.js';
 import { scan } from './scan.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>';
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
   const flagIndex = args.indexOf(flagName);
@@ -42,31 +43,50 @@ function main(): void {
     }
 
     const tokenPath = getFlagValue(restArgs, '--tokens');
+    const configPath = getFlagValue(restArgs, '--config');
     const formatValue = getFlagValue(restArgs, '--format');
     const outputPath = getFlagValue(restArgs, '--out');
     const reportValue = getFlagValue(restArgs, '--report');
     const limitValue = getFlagValue(restArgs, '--limit');
-    const limit = parseLimit(limitValue);
-    const explain = hasFlag(restArgs, '--explain');
+    let loadedConfig: ReturnType<typeof loadConfig>;
 
-    if (formatValue && formatValue !== 'json') {
-      console.error(`Unsupported format: ${formatValue}`);
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
       return;
     }
 
-    if (formatValue === 'json' && !outputPath) {
+    const config = loadedConfig.config;
+    const configuredTokenPath = config.tokens ?? config.sources?.tokens;
+    const resolvedTokenPath = tokenPath ?? configuredTokenPath;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const resolvedReportValue = reportValue ?? config.report?.mode;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+    const explain =
+      hasFlag(restArgs, '--explain') || config.report?.explain === true;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
       console.error('The --out option is required when using --format json');
       process.exitCode = 1;
       return;
     }
 
     if (
-      reportValue &&
-      reportValue !== 'summary' &&
-      reportValue !== 'detailed'
+      resolvedReportValue &&
+      resolvedReportValue !== 'summary' &&
+      resolvedReportValue !== 'detailed'
     ) {
-      console.error(`Unsupported report mode: ${reportValue}`);
+      console.error(`Unsupported report mode: ${resolvedReportValue}`);
       process.exitCode = 1;
       return;
     }
@@ -78,12 +98,12 @@ function main(): void {
     }
 
     scan(targetPath, {
-      tokenPath,
-      format: formatValue === 'json' ? 'json' : undefined,
-      outputPath,
+      tokenPath: resolvedTokenPath,
+      format: resolvedFormatValue === 'json' ? 'json' : undefined,
+      outputPath: resolvedOutputPath,
       reportMode:
-        reportValue === 'summary' || reportValue === 'detailed'
-          ? reportValue
+        resolvedReportValue === 'summary' || resolvedReportValue === 'detailed'
+          ? resolvedReportValue
           : undefined,
       limit,
       explain,
