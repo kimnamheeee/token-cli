@@ -6,6 +6,7 @@ import type {
   DetectedHardcodedValue,
   RankedTokenCandidate,
 } from '../types/index.js';
+import { buildClassifiedReportSummary } from './buildReportSummary.js';
 
 interface BaseStructuredIssue {
   file: string;
@@ -147,8 +148,18 @@ export function exportClassifiedJsonReport({
     return left.column - right.column;
   });
 
+  const summary = buildClassifiedReportSummary(classifiedIssues);
+
   return writeJsonReport(outputPath, {
     target: targetPath,
+    summary: {
+      totalIssues: summary.totalIssues,
+      cases: summary.cases,
+      confidence: summary.confidence,
+    },
+    hotspots: summary.hotspots,
+    recommendations: summary.recommendations,
+    details: issues,
     issues,
   });
 }

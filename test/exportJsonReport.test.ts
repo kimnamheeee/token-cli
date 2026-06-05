@@ -123,6 +123,30 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
   const report = readJson(resolvedPath);
 
   assert.equal(report.issues.length, 2);
+  assert.equal(report.details.length, 2);
+  assert.equal(report.summary.totalIssues, 2);
+  assert.deepEqual(report.summary.cases, {
+    deterministic: 1,
+    ambiguous: 1,
+    'no-candidate': 0,
+    unsupported: 0,
+  });
+  assert.deepEqual(report.summary.confidence, {
+    high: 1,
+    medium: 0,
+    low: 0,
+  });
+  assert.deepEqual(report.hotspots.files, [
+    {
+      value: 'src/A.tsx',
+      count: 1,
+    },
+    {
+      value: 'src/B.tsx',
+      count: 1,
+    },
+  ]);
+  assert.equal(report.recommendations[0].token, 'semantic.color.text.primary');
   assert.equal(report.issues[0].file, 'src/A.tsx');
   assert.equal(report.issues[0].value, '#ff0000');
   assert.deepEqual(report.issues[0].candidates, [

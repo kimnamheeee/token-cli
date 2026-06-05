@@ -6,6 +6,10 @@ import type {
   NoCandidateMatch,
   UnsupportedMatch,
 } from '../types/index.js';
+import {
+  buildClassifiedReportSummary,
+  getRecommendationConfidence,
+} from './buildReportSummary.js';
 
 interface DetectionReportInput {
   targetPath: string;
@@ -15,6 +19,8 @@ interface DetectionReportInput {
 
 interface ClassifiedReportInput extends DetectionReportInput {
   classifiedIssues: ClassifiedIssueSets;
+  mode?: 'summary' | 'detailed';
+  limit?: number;
 }
 
 const ANSI = {
@@ -57,37 +63,6 @@ function formatDetectedType(detectedValue: DetectedHardcodedValue): string {
   }
 
   return detectedValue.tokenGroup;
-}
-
-function getRecommendationConfidence(
-  match: AmbiguousTokenMatch,
-): 'high' | 'medium' | 'low' {
-  const [topCandidate, nextCandidate] = match.rankedCandidates ?? [];
-
-  if (!topCandidate || !nextCandidate) {
-    return 'low';
-  }
-
-  const hasStrongReason = topCandidate.reasons.some(
-    (reason) =>
-      reason.includes('role keyword') || reason.includes('file context'),
-  );
-
-  if (!hasStrongReason) {
-    return 'low';
-  }
-
-  const scoreGap = topCandidate.score - nextCandidate.score;
-
-  if (scoreGap >= 20) {
-    return 'high';
-  }
-
-  if (scoreGap >= 10) {
-    return 'medium';
-  }
-
-  return 'low';
 }
 
 function printSectionHeader(
@@ -167,75 +142,116 @@ function printAmbiguousMatch(index: number, match: AmbiguousTokenMatch): void {
   }
 }
 
-function printNoCandidateMatch(index: number, match: NoCandidateMatch): void {
-  printIssueHeader(index, match);
-  printBaseIssueDetails(match);
-  console.log(`    detected type: ${formatDetectedType(match)}`);
-}
-
-function printUnsupportedMatch(index: number, match: UnsupportedMatch): void {
-  printIssueHeader(index, match);
-  printBaseIssueDetails(match);
-  console.log(`    detected type: ${formatDetectedType(match)}`);
-}
-
-export function printDetectionReport({
-  targetPath,
-  blockCount,
-  detectedValues,
-}: DetectionReportInput): void {
-  console.log(bold(`Scan summary for ${targetPath}`));
-  console.log('');
+function printClassificationCounts(
+  classifiedIssues: ClassifiedIssueSets,
+): void {
+  console.log(bold('Classification'));
   console.log(
-    `Found ${detectedValues.length} hardcoded style value(s) in ${blockCount} inline style block(s).`,
+    `${colorize('- deterministic', ANSI.green)}: ${classifiedIssues.deterministic.length}  ${colorize('-> single exact token candidate', ANSI.dim)}`,
+  );
+  console.log(
+    `${colorize('- ambiguous', ANSI.yellow)}: ${classifiedIssues.ambiguous.length}      ${colorize('-> multiple token candidates', ANSI.dim)}`,
+  );
+  console.log(
+    `${colorize('- no-candidate', ANSI.red)}: ${classifiedIssues.noCandidate.length}   ${colorize('-> no matching token found', ANSI.dim)}`,
+  );
+  console.log(
+    `${colorize('- unsupported', ANSI.magenta)}: ${classifiedIssues.unsupported.length}   ${colorize('-> detected, but not handled by current token rules', ANSI.dim)}`,
+  );
+  console.log('');
+}
+
+function printSummaryMode(
+  classifiedIssues: ClassifiedIssueSets,
+  limit: number,
+): void {
+  const summary = buildClassifiedReportSummary(classifiedIssues, {
+    recommendationLimit: limit,
+  });
+
+  if (summary.totalIssues === 0) {
+    console.log(colorize('No classified issues found.', ANSI.gray));
+    return;
+  }
+
+  console.log(bold('Recommendation confidence'));
+  console.log(
+    `${colorize('- high', ANSI.green)}: ${summary.confidence.high}  ${colorize('- medium', ANSI.yellow)}: ${summary.confidence.medium}  ${colorize('- low', ANSI.gray)}: ${summary.confidence.low}`,
   );
   console.log('');
 
-  printSectionHeader(
-    'Detected hardcoded values',
-    'These values are within the current detector scope.',
-    ANSI.cyan,
-  );
+  if (summary.hotspots.files.length > 0 || summary.hotspots.values.length > 0) {
+    printSectionHeader(
+      'Hotspots',
+      'Highest-count files and repeated raw values.',
+      ANSI.cyan,
+    );
 
-  detectedValues.forEach((detectedValue, index) => {
-    printIssueHeader(index + 1, detectedValue);
-    printBaseIssueDetails(detectedValue);
-    console.log(`    detected type: ${formatDetectedType(detectedValue)}`);
-  });
+    if (summary.hotspots.files.length > 0) {
+      console.log('    files:');
+
+      for (const hotspot of summary.hotspots.files) {
+        console.log(`      - ${hotspot.value}: ${hotspot.count}`);
+      }
+    }
+
+    if (summary.hotspots.values.length > 0) {
+      console.log('    values:');
+
+      for (const hotspot of summary.hotspots.values) {
+        console.log(
+          `      - ${JSON.stringify(hotspot.value)}: ${hotspot.count}`,
+        );
+      }
+    }
+
+    console.log('');
+  }
+
+  if (summary.recommendations.length > 0) {
+    printSectionHeader(
+      'Top recommendations',
+      `Showing up to ${limit} ambiguous issue(s) with ranked token candidates.`,
+      ANSI.yellow,
+    );
+
+    summary.recommendations.forEach((recommendation, index) => {
+      console.log(
+        colorize(
+          `[${index + 1}] ${recommendation.file}:${recommendation.line}:${recommendation.column}`,
+          ANSI.bold,
+        ),
+      );
+      console.log(`    property: ${recommendation.property}`);
+      console.log(`    raw value: ${JSON.stringify(recommendation.value)}`);
+      console.log(
+        `    token: ${colorize(recommendation.token, ANSI.bold, ANSI.yellow)} ${colorize(`(score ${recommendation.score}, gap ${recommendation.scoreGap}, ${recommendation.confidence} confidence)`, ANSI.dim)}`,
+      );
+      console.log('    reasons:');
+
+      for (const reason of recommendation.reasons) {
+        console.log(`      - ${reason}`);
+      }
+    });
+
+    console.log('');
+    return;
+  }
+
+  console.log(
+    colorize(
+      'No ranked ambiguous recommendations. Use --report detailed for the full issue list.',
+      ANSI.gray,
+    ),
+  );
 }
 
-export function printClassifiedReport({
-  targetPath,
-  blockCount,
-  detectedValues,
-  classifiedIssues,
-}: ClassifiedReportInput): void {
+function printDetailedMode(classifiedIssues: ClassifiedIssueSets): void {
   const totalIssues =
     classifiedIssues.deterministic.length +
     classifiedIssues.ambiguous.length +
     classifiedIssues.noCandidate.length +
     classifiedIssues.unsupported.length;
-
-  console.log(bold(`Scan summary for ${targetPath}`));
-  console.log('');
-  console.log(
-    `Found ${detectedValues.length} hardcoded style value(s) in ${blockCount} inline style block(s).`,
-  );
-  console.log('');
-  console.log(bold('Classification'));
-  console.log(
-    `${colorize('- deterministic', ANSI.green)}: ${classifiedIssues.deterministic.length}  ${colorize('→ single exact token candidate', ANSI.dim)}`,
-  );
-  console.log(
-    `${colorize('- ambiguous', ANSI.yellow)}: ${classifiedIssues.ambiguous.length}      ${colorize('→ multiple token candidates', ANSI.dim)}`,
-  );
-  console.log(
-    `${colorize('- no-candidate', ANSI.red)}: ${classifiedIssues.noCandidate.length}   ${colorize('→ no matching token found', ANSI.dim)}`,
-  );
-  console.log(
-    `${colorize('- unsupported', ANSI.magenta)}: ${classifiedIssues.unsupported.length}   ${colorize('→ detected, but not handled by current token rules', ANSI.dim)}`,
-  );
-  console.log('');
 
   let issueIndex = 1;
 
@@ -300,4 +316,65 @@ export function printClassifiedReport({
   if (totalIssues === 0) {
     console.log(colorize('No classified issues found.', ANSI.gray));
   }
+}
+
+function printNoCandidateMatch(index: number, match: NoCandidateMatch): void {
+  printIssueHeader(index, match);
+  printBaseIssueDetails(match);
+  console.log(`    detected type: ${formatDetectedType(match)}`);
+}
+
+function printUnsupportedMatch(index: number, match: UnsupportedMatch): void {
+  printIssueHeader(index, match);
+  printBaseIssueDetails(match);
+  console.log(`    detected type: ${formatDetectedType(match)}`);
+}
+
+export function printDetectionReport({
+  targetPath,
+  blockCount,
+  detectedValues,
+}: DetectionReportInput): void {
+  console.log(bold(`Scan summary for ${targetPath}`));
+  console.log('');
+  console.log(
+    `Found ${detectedValues.length} hardcoded style value(s) in ${blockCount} inline style block(s).`,
+  );
+  console.log('');
+
+  printSectionHeader(
+    'Detected hardcoded values',
+    'These values are within the current detector scope.',
+    ANSI.cyan,
+  );
+
+  detectedValues.forEach((detectedValue, index) => {
+    printIssueHeader(index + 1, detectedValue);
+    printBaseIssueDetails(detectedValue);
+    console.log(`    detected type: ${formatDetectedType(detectedValue)}`);
+  });
+}
+
+export function printClassifiedReport({
+  targetPath,
+  blockCount,
+  detectedValues,
+  classifiedIssues,
+  mode = 'summary',
+  limit = 10,
+}: ClassifiedReportInput): void {
+  console.log(bold(`Scan summary for ${targetPath}`));
+  console.log('');
+  console.log(
+    `Found ${detectedValues.length} hardcoded style value(s) in ${blockCount} inline style block(s).`,
+  );
+  console.log('');
+  printClassificationCounts(classifiedIssues);
+
+  if (mode === 'detailed') {
+    printDetailedMode(classifiedIssues);
+    return;
+  }
+
+  printSummaryMode(classifiedIssues, limit);
 }

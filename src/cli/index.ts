@@ -1,5 +1,8 @@
 import { scan } from './scan.js';
 
+const USAGE =
+  'Usage: token-validator scan <target> --tokens <path> --report summary|detailed --limit <n> --format json --out <path>';
+
 function getFlagValue(args: string[], flagName: string): string | undefined {
   const flagIndex = args.indexOf(flagName);
 
@@ -10,12 +13,26 @@ function getFlagValue(args: string[], flagName: string): string | undefined {
   return args[flagIndex + 1];
 }
 
+function parseLimit(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsedValue = Number.parseInt(value, 10);
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    return undefined;
+  }
+
+  return parsedValue;
+}
+
 function main(): void {
   const [, , command, targetPath, ...restArgs] = process.argv;
 
   if (command === 'scan') {
     if (!targetPath) {
-      console.error('Usage: token-validator scan <target> --tokens <path> --format json --out <path>');
+      console.error(USAGE);
       process.exitCode = 1;
       return;
     }
@@ -23,6 +40,9 @@ function main(): void {
     const tokenPath = getFlagValue(restArgs, '--tokens');
     const formatValue = getFlagValue(restArgs, '--format');
     const outputPath = getFlagValue(restArgs, '--out');
+    const reportValue = getFlagValue(restArgs, '--report');
+    const limitValue = getFlagValue(restArgs, '--limit');
+    const limit = parseLimit(limitValue);
 
     if (formatValue && formatValue !== 'json') {
       console.error(`Unsupported format: ${formatValue}`);
@@ -36,10 +56,31 @@ function main(): void {
       return;
     }
 
+    if (
+      reportValue &&
+      reportValue !== 'summary' &&
+      reportValue !== 'detailed'
+    ) {
+      console.error(`Unsupported report mode: ${reportValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
     scan(targetPath, {
       tokenPath,
       format: formatValue === 'json' ? 'json' : undefined,
       outputPath,
+      reportMode:
+        reportValue === 'summary' || reportValue === 'detailed'
+          ? reportValue
+          : undefined,
+      limit,
     });
     process.exitCode = 0;
     return;
@@ -47,7 +88,7 @@ function main(): void {
 
   console.log('token-validator');
   console.log('');
-  console.log('Usage: token-validator scan <target> --tokens <path> --format json --out <path>');
+  console.log(USAGE);
   process.exitCode = 1;
 }
 

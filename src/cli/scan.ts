@@ -15,10 +15,12 @@ export interface ScanOptions {
   tokenPath?: string;
   format?: 'json';
   outputPath?: string;
+  reportMode?: 'summary' | 'detailed';
+  limit?: number;
 }
 
 export function scan(targetPath: string, options: ScanOptions = {}): void {
-  const { tokenPath, format, outputPath } = options;
+  const { tokenPath, format, outputPath, reportMode, limit } = options;
   const blocks = extractInlineStylesFromFile(targetPath);
   const detectedValues = detectHardcodedValues(blocks);
 
@@ -28,7 +30,9 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
   }
 
   if (detectedValues.length === 0) {
-    console.log(`No supported hardcoded color or spacing values found in ${targetPath}`);
+    console.log(
+      `No supported hardcoded color or spacing values found in ${targetPath}`,
+    );
     return;
   }
 
@@ -36,13 +40,15 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
     const tokens = loadTokens(tokenPath);
     const classifiedIssues = classifyIssues(detectedValues, tokens);
     const totalClassifiedIssues =
-      classifiedIssues.deterministic.length
-      + classifiedIssues.ambiguous.length
-      + classifiedIssues.noCandidate.length
-      + classifiedIssues.unsupported.length;
+      classifiedIssues.deterministic.length +
+      classifiedIssues.ambiguous.length +
+      classifiedIssues.noCandidate.length +
+      classifiedIssues.unsupported.length;
 
     if (totalClassifiedIssues === 0) {
-      console.log(`No exact matching tokens found for supported values in ${targetPath}`);
+      console.log(
+        `No exact matching tokens found for supported values in ${targetPath}`,
+      );
       return;
     }
 
@@ -51,6 +57,8 @@ export function scan(targetPath: string, options: ScanOptions = {}): void {
       blockCount: blocks.length,
       detectedValues,
       classifiedIssues,
+      mode: reportMode,
+      limit,
     });
 
     if (format === 'json' && outputPath) {
