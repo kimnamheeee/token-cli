@@ -35,7 +35,7 @@ import { getSupportedTokenGroup } from '../utils/valueParsers.js';
 
 type TokenExpressionValue = TokenNode | TokenValue;
 
-interface TokenLeafInfo {
+export interface TokenLeafInfo {
   rawValue: unknown;
   aliasOf?: string;
   metadata?: Record<string, unknown>;
@@ -54,7 +54,9 @@ function isTokenNode(value: unknown): value is TokenNode {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isTokenResolvedObject(value: TokenResolvedValue): value is Record<string, TokenValue> {
+function isTokenResolvedObject(
+  value: TokenResolvedValue,
+): value is Record<string, TokenValue> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -73,7 +75,10 @@ function normalizeResolvedValue(value: TokenResolvedValue): string {
 
   return JSON.stringify(
     Object.fromEntries(
-      sortedEntries.map(([key, entryValue]) => [key, normalizeTokenValue(entryValue)]),
+      sortedEntries.map(([key, entryValue]) => [
+        key,
+        normalizeTokenValue(entryValue),
+      ]),
     ),
   );
 }
@@ -82,9 +87,9 @@ function getTokenLayerFromSegments(segments: string[]): TokenLayer {
   const [firstSegment] = segments;
 
   if (
-    firstSegment === 'primitive'
-    || firstSegment === 'semantic'
-    || firstSegment === 'component'
+    firstSegment === 'primitive' ||
+    firstSegment === 'semantic' ||
+    firstSegment === 'component'
   ) {
     return firstSegment;
   }
@@ -92,7 +97,30 @@ function getTokenLayerFromSegments(segments: string[]): TokenLayer {
   return 'unknown';
 }
 
-function getTokenGroupFromSegments(segments: string[], layer: TokenLayer): string {
+function getTokenGroupFromSegments(
+  segments: string[],
+  layer: TokenLayer,
+): string {
+  const [firstSegment] = segments;
+
+  if (firstSegment === 'colors') {
+    return 'color';
+  }
+
+  if (firstSegment === 'rounded') {
+    return 'radius';
+  }
+
+  if (
+    firstSegment === 'color' ||
+    firstSegment === 'spacing' ||
+    firstSegment === 'radius' ||
+    firstSegment === 'typography' ||
+    firstSegment === 'shadow'
+  ) {
+    return firstSegment;
+  }
+
   if (layer === 'primitive' || layer === 'semantic') {
     return segments[1] ?? 'unknown';
   }
@@ -141,10 +169,9 @@ function buildFlattenedToken(record: TokenRecord): FlattenedToken {
   };
 }
 
-export function buildTokenIndexes(entries: FlattenedToken[]): Pick<
-  LoadedTokens,
-  'entriesByPath' | 'entriesByNormalizedValue'
-> {
+export function buildTokenIndexes(
+  entries: FlattenedToken[],
+): Pick<LoadedTokens, 'entriesByPath' | 'entriesByNormalizedValue'> {
   const entriesByPath = new Map<string, FlattenedToken>();
   const entriesByNormalizedValue = new Map<string, FlattenedToken[]>();
 
@@ -167,10 +194,9 @@ export function buildTokenIndexes(entries: FlattenedToken[]): Pick<
   };
 }
 
-function buildRecordIndexes(records: TokenRecord[]): Pick<
-  LoadedTokens,
-  'recordsById' | 'recordsByNormalizedValue'
-> {
+function buildRecordIndexes(
+  records: TokenRecord[],
+): Pick<LoadedTokens, 'recordsById' | 'recordsByNormalizedValue'> {
   const recordsById = new Map<string, TokenRecord>();
   const recordsByNormalizedValue = new Map<string, TokenRecord[]>();
 
@@ -254,7 +280,9 @@ function flattenTokenRecords(
     }
 
     if (isTokenNode(value)) {
-      records.push(...flattenTokenRecords(value, sourcePath, leafInfoByPath, segments));
+      records.push(
+        ...flattenTokenRecords(value, sourcePath, leafInfoByPath, segments),
+      );
       continue;
     }
 
@@ -268,11 +296,16 @@ export function flattenTokens(
   node: TokenNode,
   parentSegments: string[] = [],
 ): FlattenedToken[] {
-  const records = flattenTokenRecords(node, '<inline>', new Map(), parentSegments);
+  const records = flattenTokenRecords(
+    node,
+    '<inline>',
+    new Map(),
+    parentSegments,
+  );
   return records.map(buildFlattenedToken);
 }
 
-function createLoadedTokens(
+export function createLoadedTokens(
   tree: TokenNode,
   sourcePath: string,
   leafInfoByPath = new Map<string, TokenLeafInfo>(),
@@ -293,7 +326,11 @@ function createLoadedTokens(
 }
 
 function unwrapExpression(node: Node): Expression {
-  if (isTSAsExpression(node) || isTSSatisfiesExpression(node) || isTSTypeAssertion(node)) {
+  if (
+    isTSAsExpression(node) ||
+    isTSSatisfiesExpression(node) ||
+    isTSTypeAssertion(node)
+  ) {
     return unwrapExpression(node.expression);
   }
 
@@ -317,7 +354,9 @@ function getObjectPropertyKey(node: Node, pathSegments: string[]): string {
     return String(node.value);
   }
 
-  throw new Error(`Unsupported token object key at "${pathSegments.join('.')}"`);
+  throw new Error(
+    `Unsupported token object key at "${pathSegments.join('.')}"`,
+  );
 }
 
 function getMemberPropertyKey(node: Node, pathSegments: string[]): string {
@@ -333,7 +372,9 @@ function getMemberPropertyKey(node: Node, pathSegments: string[]): string {
     return String(node.value);
   }
 
-  throw new Error(`Unsupported token member access at "${pathSegments.join('.')}"`);
+  throw new Error(
+    `Unsupported token member access at "${pathSegments.join('.')}"`,
+  );
 }
 
 function getReferencePath(
@@ -350,7 +391,10 @@ function getReferencePath(
     return null;
   }
 
-  const objectPath = getReferencePath(expression.object as Expression, pathSegments);
+  const objectPath = getReferencePath(
+    expression.object as Expression,
+    pathSegments,
+  );
 
   if (!objectPath) {
     return null;
@@ -388,7 +432,10 @@ function setLeafInfo(
 
 function evaluateTokenExpression(
   node: Expression,
-  resolveBinding: (name: string, pathSegments: string[]) => TokenExpressionValue,
+  resolveBinding: (
+    name: string,
+    pathSegments: string[],
+  ) => TokenExpressionValue,
   rawContent: string,
   leafInfoByPath: Map<string, TokenLeafInfo>,
   pathSegments: string[] = [],
@@ -406,9 +453,9 @@ function evaluateTokenExpression(
   }
 
   if (
-    isUnaryExpression(expression)
-    && expression.operator === '-'
-    && isNumericLiteral(expression.argument)
+    isUnaryExpression(expression) &&
+    expression.operator === '-' &&
+    isNumericLiteral(expression.argument)
   ) {
     const value = -expression.argument.value;
     setLeafInfo(leafInfoByPath, pathSegments, value);
@@ -495,10 +542,7 @@ function evaluateTokenExpression(
   );
 }
 
-function parseJsonTokens(
-  rawContent: string,
-  sourcePath: string,
-): LoadedTokens {
+function parseJsonTokens(rawContent: string, sourcePath: string): LoadedTokens {
   const parsed: unknown = JSON.parse(rawContent);
 
   if (!isTokenNode(parsed)) {
@@ -533,7 +577,11 @@ function parseTypeScriptTokens(
     }
 
     for (const declarator of statement.declaration.declarations) {
-      if (!isVariableDeclarator(declarator) || !declarator.init || !isIdentifier(declarator.id)) {
+      if (
+        !isVariableDeclarator(declarator) ||
+        !declarator.init ||
+        !isIdentifier(declarator.id)
+      ) {
         continue;
       }
 
@@ -541,7 +589,10 @@ function parseTypeScriptTokens(
     }
   }
 
-  function resolveBinding(name: string, pathSegments: string[]): TokenExpressionValue {
+  function resolveBinding(
+    name: string,
+    pathSegments: string[],
+  ): TokenExpressionValue {
     const cachedValue = cache.get(name);
 
     if (cachedValue !== undefined) {
@@ -582,7 +633,9 @@ function parseTypeScriptTokens(
     const exportValue = resolveBinding(exportName, [exportName]);
 
     if (!isTokenNode(exportValue)) {
-      throw new Error(`Top-level token export "${exportName}" must be an object`);
+      throw new Error(
+        `Top-level token export "${exportName}" must be an object`,
+      );
     }
 
     tree[exportName] = exportValue;
@@ -606,12 +659,12 @@ const typeScriptTokenAdapter: TokenSourceAdapter = {
   },
   supports(extension) {
     return (
-      extension === '.ts'
-      || extension === '.tsx'
-      || extension === '.js'
-      || extension === '.jsx'
-      || extension === '.mjs'
-      || extension === '.cjs'
+      extension === '.ts' ||
+      extension === '.tsx' ||
+      extension === '.js' ||
+      extension === '.jsx' ||
+      extension === '.mjs' ||
+      extension === '.cjs'
     );
   },
 };
@@ -621,12 +674,19 @@ const tokenSourceAdapters: TokenSourceAdapter[] = [
   typeScriptTokenAdapter,
 ];
 
-export function parseTokens(rawContent: string, sourcePath = 'tokens.json'): LoadedTokens {
+export function parseTokens(
+  rawContent: string,
+  sourcePath = 'tokens.json',
+): LoadedTokens {
   const extension = path.extname(sourcePath).toLowerCase();
-  const adapter = tokenSourceAdapters.find((candidate) => candidate.supports(extension));
+  const adapter = tokenSourceAdapters.find((candidate) =>
+    candidate.supports(extension),
+  );
 
   if (!adapter) {
-    throw new Error(`Unsupported token file extension: ${extension || '<none>'}`);
+    throw new Error(
+      `Unsupported token file extension: ${extension || '<none>'}`,
+    );
   }
 
   return adapter.parse(rawContent, sourcePath);

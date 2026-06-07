@@ -1,10 +1,12 @@
 import { loadConfig } from '../config/loadConfig.js';
 import { diff } from './diff.js';
+import { migrate } from './migrate.js';
 import { scan } from './scan.js';
 import { setup } from './setup.js';
+import { sync } from './sync.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator setup --config <path> --force';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator setup --config <path> --force';
 
 const FLAGS_WITH_VALUES = new Set([
   '--config',
@@ -15,6 +17,8 @@ const FLAGS_WITH_VALUES = new Set([
   '--out',
   '--base',
   '--head',
+  '--design',
+  '--authority',
 ]);
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
@@ -43,6 +47,12 @@ function parseLimit(value: string | undefined): number | undefined {
 
 function hasFlag(args: string[], flagName: string): boolean {
   return args.includes(flagName);
+}
+
+function isAuthorityValue(
+  value: string | undefined,
+): value is 'design-md' | 'code' | 'compare-only' {
+  return value === 'design-md' || value === 'code' || value === 'compare-only';
 }
 
 function getPositionalArgs(args: string[]): string[] {
@@ -147,6 +157,143 @@ function main(): void {
         outputPath: resolvedOutputPath,
         include: config.include,
         exclude: config.exclude,
+        limit,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === 'migrate') {
+    if (!targetPath) {
+      console.error(USAGE);
+      process.exitCode = 1;
+      return;
+    }
+
+    const tokenPath = getFlagValue(restArgs, '--tokens');
+    const configPath = getFlagValue(restArgs, '--config');
+    const formatValue = getFlagValue(restArgs, '--format');
+    const outputPath = getFlagValue(restArgs, '--out');
+    const limitValue = getFlagValue(restArgs, '--limit');
+    let loadedConfig: ReturnType<typeof loadConfig>;
+
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadedConfig.config;
+    const resolvedTokenPath =
+      tokenPath ?? config.tokens ?? config.sources?.tokens;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
+      console.error('The --out option is required when using --format json');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      process.exitCode = migrate(targetPath, {
+        tokenPath: resolvedTokenPath,
+        format: resolvedFormatValue === 'json' ? 'json' : undefined,
+        outputPath: resolvedOutputPath,
+        include: config.include,
+        exclude: config.exclude,
+        limit,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === 'sync') {
+    const syncArgs = targetPath ? [targetPath, ...restArgs] : restArgs;
+    const tokenPath = getFlagValue(syncArgs, '--tokens');
+    const designPath = getFlagValue(syncArgs, '--design');
+    const configPath = getFlagValue(syncArgs, '--config');
+    const formatValue = getFlagValue(syncArgs, '--format');
+    const outputPath = getFlagValue(syncArgs, '--out');
+    const limitValue = getFlagValue(syncArgs, '--limit');
+    const authorityValue = getFlagValue(syncArgs, '--authority');
+    let loadedConfig: ReturnType<typeof loadConfig>;
+
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadedConfig.config;
+    const resolvedTokenPath =
+      tokenPath ?? config.tokens ?? config.sources?.tokens;
+    const resolvedDesignPath = designPath ?? config.sources?.design;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const resolvedAuthority = authorityValue ?? config.authority;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
+      console.error('The --out option is required when using --format json');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedAuthority && !isAuthorityValue(resolvedAuthority)) {
+      console.error(
+        'The --authority option must be "design-md", "code", or "compare-only"',
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      process.exitCode = sync({
+        designPath: resolvedDesignPath,
+        tokenPath: resolvedTokenPath,
+        authority: isAuthorityValue(resolvedAuthority)
+          ? resolvedAuthority
+          : undefined,
+        format: resolvedFormatValue === 'json' ? 'json' : undefined,
+        outputPath: resolvedOutputPath,
         limit,
       });
     } catch (error) {
