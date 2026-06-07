@@ -1,4 +1,5 @@
 import { loadConfig } from '../config/loadConfig.js';
+import { consolidate } from './consolidate.js';
 import { designDiff } from './designDiff.js';
 import { diff } from './diff.js';
 import { migrate } from './migrate.js';
@@ -7,7 +8,7 @@ import { setup } from './setup.js';
 import { sync } from './sync.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator design-diff <old-design> <new-design> --target <path> --format json --out <path>\n       token-validator setup --config <path> --force';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator consolidate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator design-diff <old-design> <new-design> --target <path> --format json --out <path>\n       token-validator setup --config <path> --force';
 
 const FLAGS_WITH_VALUES = new Set([
   '--config',
@@ -218,6 +219,67 @@ function main(): void {
 
     try {
       process.exitCode = migrate(targetPath, {
+        tokenPath: resolvedTokenPath,
+        format: resolvedFormatValue === 'json' ? 'json' : undefined,
+        outputPath: resolvedOutputPath,
+        include: config.include,
+        exclude: config.exclude,
+        limit,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === 'consolidate') {
+    const consolidateArgs = targetPath ? [targetPath, ...restArgs] : restArgs;
+    const tokenPath = getFlagValue(consolidateArgs, '--tokens');
+    const configPath = getFlagValue(consolidateArgs, '--config');
+    const formatValue = getFlagValue(consolidateArgs, '--format');
+    const outputPath = getFlagValue(consolidateArgs, '--out');
+    const limitValue = getFlagValue(consolidateArgs, '--limit');
+    const [consolidateTargetPath] = getPositionalArgs(consolidateArgs);
+    let loadedConfig: ReturnType<typeof loadConfig>;
+
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadedConfig.config;
+    const resolvedTokenPath =
+      tokenPath ?? config.tokens ?? config.sources?.tokens;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
+      console.error('The --out option is required when using --format json');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      process.exitCode = consolidate({
+        targetPath: consolidateTargetPath,
         tokenPath: resolvedTokenPath,
         format: resolvedFormatValue === 'json' ? 'json' : undefined,
         outputPath: resolvedOutputPath,

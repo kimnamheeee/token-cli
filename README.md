@@ -105,6 +105,24 @@ Report groups:
 JSON output includes stable migration issue ids such as `MIG-1a2b3c4d5e` and
 `replacementCandidateId` for future codemod/apply support.
 
+## Consolidate command
+
+`consolidate` analyzes token definitions for same-value groups, near-value
+groups, unused tokens, deprecated tokens, and replacement metadata. Passing a
+target directory adds raw-value usage distribution by property role and file.
+
+```bash
+token-validator consolidate ./src --tokens ./tokens.json
+token-validator consolidate ./src --tokens ./tokens.json --format json --out reports/token-consolidation.json
+```
+
+Recommendations are conservative:
+
+- `keep-separate`: same value appears across distinct semantic roles or property contexts
+- `deprecate`: deprecated tokens or primitive duplicates should be phased out
+- `replace-with`: metadata names an explicit replacement token
+- `merge-review`: same-value tokens need human review before merging
+
 ## DESIGN.md sync
 
 `sync` compares DESIGN.md frontmatter tokens with the code token source. This
