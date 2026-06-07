@@ -123,6 +123,22 @@ Recommendations are conservative:
 - `replace-with`: metadata names an explicit replacement token
 - `merge-review`: same-value tokens need human review before merging
 
+## Adoption command
+
+`adoption` scans a codebase and writes a design-system adoption snapshot. It
+reports token coverage, category coverage, raw values blocking coverage,
+underused token groups, theme mode coverage, and optional DESIGN.md parity.
+
+```bash
+token-validator adoption ./src --tokens ./tokens.json
+token-validator adoption ./src --tokens ./tokens.json --design ./DESIGN.md --modes light,dark,high-contrast
+token-validator adoption ./src --tokens ./tokens.json --format json --out reports/adoption-snapshot.json
+```
+
+Theme safety reads mode metadata from DTCG `$extensions.modes` or
+`$extensions.modeValues`. Raw unmatched values are reported as theme adaptation
+risk because they bypass token mode mappings.
+
 ## DESIGN.md sync
 
 `sync` compares DESIGN.md frontmatter tokens with the code token source. This

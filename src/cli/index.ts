@@ -1,4 +1,5 @@
 import { loadConfig } from '../config/loadConfig.js';
+import { adoption } from './adoption.js';
 import { consolidate } from './consolidate.js';
 import { designDiff } from './designDiff.js';
 import { diff } from './diff.js';
@@ -8,7 +9,7 @@ import { setup } from './setup.js';
 import { sync } from './sync.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator consolidate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator design-diff <old-design> <new-design> --target <path> --format json --out <path>\n       token-validator setup --config <path> --force';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator consolidate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator adoption <target> --config <path> --tokens <path> --design <path> --modes light,dark --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator design-diff <old-design> <new-design> --target <path> --format json --out <path>\n       token-validator setup --config <path> --force';
 
 const FLAGS_WITH_VALUES = new Set([
   '--config',
@@ -22,6 +23,7 @@ const FLAGS_WITH_VALUES = new Set([
   '--design',
   '--authority',
   '--target',
+  '--modes',
 ]);
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
@@ -56,6 +58,19 @@ function isAuthorityValue(
   value: string | undefined,
 ): value is 'design-md' | 'code' | 'compare-only' {
   return value === 'design-md' || value === 'code' || value === 'compare-only';
+}
+
+function parseCommaSeparatedOption(
+  value: string | undefined,
+): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function getPositionalArgs(args: string[]): string[] {
@@ -281,6 +296,89 @@ function main(): void {
       process.exitCode = consolidate({
         targetPath: consolidateTargetPath,
         tokenPath: resolvedTokenPath,
+        format: resolvedFormatValue === 'json' ? 'json' : undefined,
+        outputPath: resolvedOutputPath,
+        include: config.include,
+        exclude: config.exclude,
+        limit,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === 'adoption') {
+    if (!targetPath) {
+      console.error(USAGE);
+      process.exitCode = 1;
+      return;
+    }
+
+    const tokenPath = getFlagValue(restArgs, '--tokens');
+    const designPath = getFlagValue(restArgs, '--design');
+    const configPath = getFlagValue(restArgs, '--config');
+    const formatValue = getFlagValue(restArgs, '--format');
+    const outputPath = getFlagValue(restArgs, '--out');
+    const limitValue = getFlagValue(restArgs, '--limit');
+    const authorityValue = getFlagValue(restArgs, '--authority');
+    const modesValue = getFlagValue(restArgs, '--modes');
+    let loadedConfig: ReturnType<typeof loadConfig>;
+
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadedConfig.config;
+    const resolvedTokenPath =
+      tokenPath ?? config.tokens ?? config.sources?.tokens;
+    const resolvedDesignPath = designPath ?? config.sources?.design;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const resolvedAuthority = authorityValue ?? config.authority;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
+      console.error('The --out option is required when using --format json');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedAuthority && !isAuthorityValue(resolvedAuthority)) {
+      console.error(
+        'The --authority option must be "design-md", "code", or "compare-only"',
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      process.exitCode = adoption({
+        targetPath,
+        tokenPath: resolvedTokenPath,
+        designPath: resolvedDesignPath,
+        authority: isAuthorityValue(resolvedAuthority)
+          ? resolvedAuthority
+          : undefined,
+        requiredModes: parseCommaSeparatedOption(modesValue),
         format: resolvedFormatValue === 'json' ? 'json' : undefined,
         outputPath: resolvedOutputPath,
         include: config.include,
