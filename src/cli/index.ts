@@ -1,9 +1,21 @@
 import { loadConfig } from '../config/loadConfig.js';
+import { diff } from './diff.js';
 import { scan } from './scan.js';
 import { setup } from './setup.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator setup --config <path> --force';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator setup --config <path> --force';
+
+const FLAGS_WITH_VALUES = new Set([
+  '--config',
+  '--tokens',
+  '--report',
+  '--limit',
+  '--format',
+  '--out',
+  '--base',
+  '--head',
+]);
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
   const flagIndex = args.indexOf(flagName);
@@ -33,6 +45,31 @@ function hasFlag(args: string[], flagName: string): boolean {
   return args.includes(flagName);
 }
 
+function getPositionalArgs(args: string[]): string[] {
+  const positionalArgs: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (!arg) {
+      continue;
+    }
+
+    if (FLAGS_WITH_VALUES.has(arg)) {
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--')) {
+      continue;
+    }
+
+    positionalArgs.push(arg);
+  }
+
+  return positionalArgs;
+}
+
 function main(): void {
   const [, , command, targetPath, ...restArgs] = process.argv;
 
@@ -49,6 +86,73 @@ function main(): void {
         console.error(error instanceof Error ? error.message : String(error));
         process.exitCode = 1;
       });
+    return;
+  }
+
+  if (command === 'diff') {
+    const diffArgs = targetPath ? [targetPath, ...restArgs] : restArgs;
+    const tokenPath = getFlagValue(diffArgs, '--tokens');
+    const configPath = getFlagValue(diffArgs, '--config');
+    const base = getFlagValue(diffArgs, '--base');
+    const head = getFlagValue(diffArgs, '--head');
+    const formatValue = getFlagValue(diffArgs, '--format');
+    const outputPath = getFlagValue(diffArgs, '--out');
+    const limitValue = getFlagValue(diffArgs, '--limit');
+    const files = getPositionalArgs(diffArgs);
+    let loadedConfig: ReturnType<typeof loadConfig>;
+
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadedConfig.config;
+    const resolvedTokenPath =
+      tokenPath ?? config.tokens ?? config.sources?.tokens;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
+      console.error('The --out option is required when using --format json');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      process.exitCode = diff({
+        files,
+        tokenPath: resolvedTokenPath,
+        base,
+        head,
+        staged: hasFlag(diffArgs, '--staged'),
+        strict: hasFlag(diffArgs, '--strict'),
+        format: resolvedFormatValue === 'json' ? 'json' : undefined,
+        outputPath: resolvedOutputPath,
+        include: config.include,
+        exclude: config.exclude,
+        limit,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
     return;
   }
 

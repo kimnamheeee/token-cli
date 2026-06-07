@@ -126,3 +126,31 @@ export function discoverTargetFiles(
     })
     .sort((left, right) => left.localeCompare(right));
 }
+
+export function filterDiscoveredFiles(
+  filePaths: string[],
+  rootPath = process.cwd(),
+  options: DiscoverOptions = {},
+): string[] {
+  const include = options.include ?? DEFAULT_INCLUDE;
+  const exclude = [...DEFAULT_EXCLUDE, ...(options.exclude ?? [])];
+
+  return filePaths
+    .map((filePath) => path.resolve(rootPath, filePath))
+    .filter((filePath) => {
+      try {
+        return statSync(filePath).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .filter((filePath) => {
+      const relativePath = toPosixPath(path.relative(rootPath, filePath));
+
+      return (
+        matchesAnyPattern(relativePath, include) &&
+        !matchesAnyPattern(relativePath, exclude)
+      );
+    })
+    .sort((left, right) => left.localeCompare(right));
+}
