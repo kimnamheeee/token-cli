@@ -1,4 +1,5 @@
 import { loadConfig } from '../config/loadConfig.js';
+import { designDiff } from './designDiff.js';
 import { diff } from './diff.js';
 import { migrate } from './migrate.js';
 import { scan } from './scan.js';
@@ -6,7 +7,7 @@ import { setup } from './setup.js';
 import { sync } from './sync.js';
 
 const USAGE =
-  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator setup --config <path> --force';
+  'Usage: token-validator scan <target> --config <path> --tokens <path> --report summary|detailed --limit <n> --explain --format json --out <path>\n       token-validator diff --config <path> --tokens <path> --staged --base <ref> --head <ref> --strict --format json --out <path>\n       token-validator migrate <target> --config <path> --tokens <path> --limit <n> --format json --out <path>\n       token-validator sync --design <path> --tokens <path> --authority design-md|code|compare-only --format json --out <path>\n       token-validator design-diff <old-design> <new-design> --target <path> --format json --out <path>\n       token-validator setup --config <path> --force';
 
 const FLAGS_WITH_VALUES = new Set([
   '--config',
@@ -19,6 +20,7 @@ const FLAGS_WITH_VALUES = new Set([
   '--head',
   '--design',
   '--authority',
+  '--target',
 ]);
 
 function getFlagValue(args: string[], flagName: string): string | undefined {
@@ -294,6 +296,78 @@ function main(): void {
           : undefined,
         format: resolvedFormatValue === 'json' ? 'json' : undefined,
         outputPath: resolvedOutputPath,
+        limit,
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === 'design-diff') {
+    if (!targetPath) {
+      console.error(USAGE);
+      process.exitCode = 1;
+      return;
+    }
+
+    const designDiffArgs = restArgs;
+    const newDesignPath = getPositionalArgs(designDiffArgs)[0];
+    const target = getFlagValue(designDiffArgs, '--target');
+    const configPath = getFlagValue(designDiffArgs, '--config');
+    const formatValue = getFlagValue(designDiffArgs, '--format');
+    const outputPath = getFlagValue(designDiffArgs, '--out');
+    const limitValue = getFlagValue(designDiffArgs, '--limit');
+    let loadedConfig: ReturnType<typeof loadConfig>;
+
+    if (!newDesignPath) {
+      console.error(USAGE);
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      loadedConfig = loadConfig(configPath);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+      return;
+    }
+
+    const config = loadedConfig.config;
+    const resolvedFormatValue = formatValue ?? config.report?.format;
+    const resolvedOutputPath =
+      outputPath ?? config.report?.out ?? config.report?.outputPath;
+    const limit = limitValue ? parseLimit(limitValue) : config.report?.limit;
+
+    if (resolvedFormatValue && resolvedFormatValue !== 'json') {
+      console.error(`Unsupported format: ${resolvedFormatValue}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (resolvedFormatValue === 'json' && !resolvedOutputPath) {
+      console.error('The --out option is required when using --format json');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (limitValue && !limit) {
+      console.error('The --limit option must be a positive integer');
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      process.exitCode = designDiff({
+        oldDesignPath: targetPath,
+        newDesignPath,
+        targetPath: target,
+        format: resolvedFormatValue === 'json' ? 'json' : undefined,
+        outputPath: resolvedOutputPath,
+        include: config.include,
+        exclude: config.exclude,
         limit,
       });
     } catch (error) {

@@ -26,6 +26,20 @@ export interface ParsedDesignMd {
   tokens: LoadedTokens;
   issues: DesignMdLintIssue[];
   body: string;
+  guidanceRules: DesignMdGuidanceRule[];
+}
+
+export interface DesignMdGuidanceRule {
+  token: string;
+  avoid?: {
+    properties?: string[];
+    contexts?: string[];
+  };
+  prefer?: {
+    properties?: string[];
+    contexts?: string[];
+  };
+  reason?: string;
 }
 
 interface FrontmatterLine {
@@ -211,6 +225,102 @@ function getValueAtPath(root: unknown, tokenPath: string): unknown {
   }, root);
 }
 
+function parseListValue(value: string | undefined): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  const bracketMatch = trimmedValue.match(/^\[(.*)\]$/);
+  const listText = bracketMatch ? (bracketMatch[1] ?? '') : trimmedValue;
+
+  return listText
+    .split(',')
+    .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+}
+
+function readHintValue(line: string, key: string): string | undefined {
+  const match = line.trim().match(new RegExp(`^${key}:\\s*(.*)$`));
+
+  return match?.[1]?.trim();
+}
+
+function extractGuidanceRules(body: string): DesignMdGuidanceRule[] {
+  const rules: DesignMdGuidanceRule[] = [];
+  const commentPattern = /<!--\s*token-validator:\s*([\s\S]*?)-->/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = commentPattern.exec(body))) {
+    const commentBody = match[1] ?? '';
+    let currentRule: DesignMdGuidanceRule | undefined;
+    let currentMode: 'avoid' | 'prefer' | undefined;
+
+    for (const rawLine of commentBody.split(/\r?\n/)) {
+      const line = rawLine.trim();
+
+      if (!line || line === 'rules:') {
+        continue;
+      }
+
+      const tokenValue = readHintValue(line, '- token');
+
+      if (tokenValue) {
+        currentRule = {
+          token: tokenValue,
+        };
+        rules.push(currentRule);
+        currentMode = undefined;
+        continue;
+      }
+
+      if (!currentRule) {
+        continue;
+      }
+
+      if (line === 'avoid:') {
+        currentRule.avoid = {};
+        currentMode = 'avoid';
+        continue;
+      }
+
+      if (line === 'prefer:') {
+        currentRule.prefer = {};
+        currentMode = 'prefer';
+        continue;
+      }
+
+      const reasonValue = readHintValue(line, 'reason');
+
+      if (reasonValue) {
+        currentRule.reason = reasonValue.replace(/^['"]|['"]$/g, '');
+        continue;
+      }
+
+      const properties = parseListValue(readHintValue(line, 'properties'));
+
+      if (properties && currentMode) {
+        currentRule[currentMode] = {
+          ...currentRule[currentMode],
+          properties,
+        };
+        continue;
+      }
+
+      const contexts = parseListValue(readHintValue(line, 'contexts'));
+
+      if (contexts && currentMode) {
+        currentRule[currentMode] = {
+          ...currentRule[currentMode],
+          contexts,
+        };
+      }
+    }
+  }
+
+  return rules;
+}
+
 function resolveTokenNode(
   node: unknown,
   root: TokenNode,
@@ -331,6 +441,7 @@ export function parseDesignMd(
       tokens: createLoadedTokens({}, sourcePath),
       issues,
       body,
+      guidanceRules: extractGuidanceRules(body),
     };
   }
 
@@ -350,6 +461,7 @@ export function parseDesignMd(
       tokens: createLoadedTokens({}, sourcePath),
       issues,
       body,
+      guidanceRules: extractGuidanceRules(body),
     };
   }
 
@@ -368,6 +480,7 @@ export function parseDesignMd(
     tokens: createLoadedTokens(resolvedRoot, sourcePath, leafInfoByPath),
     issues,
     body,
+    guidanceRules: extractGuidanceRules(body),
   };
 }
 

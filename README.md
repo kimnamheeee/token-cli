@@ -126,6 +126,34 @@ Sync report categories:
 
 `--authority design-md|code|compare-only` controls mismatch severity.
 
+## DESIGN.md diff
+
+`design-diff` compares two DESIGN.md files and optionally scans implementation
+code for raw values impacted by token changes. It also evaluates explicit
+`token-validator` guidance hints in the new DESIGN.md.
+
+```bash
+token-validator design-diff ./DESIGN.md ./DESIGN.next.md --target ./src
+token-validator design-diff ./DESIGN.md ./DESIGN.next.md --target ./src --format json --out reports/design-diff.json
+```
+
+Supported guidance hints use Markdown comments so the prose remains readable:
+
+```md
+<!-- token-validator:
+rules:
+  - token: colors.primary
+    avoid:
+      properties: [backgroundColor]
+      contexts: [page, layout]
+    reason: "Do not use primary for large backgrounds."
+-->
+```
+
+The CLI reports added, removed, and modified tokens, impacted raw value counts,
+and guidance warnings. Soft prose such as brand personality or visual tone is
+preserved as documentation, but it is not treated as a failing static rule.
+
 ## Current POC
 
 After installing dependencies, you can inspect a sample file with:
