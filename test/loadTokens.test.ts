@@ -34,7 +34,10 @@ test('buildTokenIndexes groups entries by path and normalized value', () => {
 
   const indexes = buildTokenIndexes(entries);
 
-  assert.equal(indexes.entriesByPath.get('semantic.color.text')?.path, 'semantic.color.text');
+  assert.equal(
+    indexes.entriesByPath.get('semantic.color.text')?.path,
+    'semantic.color.text',
+  );
   assert.equal(indexes.entriesByNormalizedValue.get('#ff0000')?.length, 2);
 });
 
@@ -56,8 +59,106 @@ test('parseTokens loads JSON token trees and creates record indexes', () => {
   );
 
   assert.equal(tokens.records.length, 2);
-  assert.equal(tokens.recordsById.get('semantic.color.text')?.normalizedResolvedValue, '#ff0000');
-  assert.equal(tokens.recordsByNormalizedValue.get('8')?.[0]?.id, 'primitive.spacing.md');
+  assert.equal(
+    tokens.recordsById.get('semantic.color.text')?.normalizedResolvedValue,
+    '#ff0000',
+  );
+  assert.equal(
+    tokens.recordsByNormalizedValue.get('8')?.[0]?.id,
+    'primitive.spacing.md',
+  );
+});
+
+test('parseTokens supports DTCG JSON tokens and metadata', () => {
+  const tokens = parseTokens(
+    JSON.stringify({
+      primitive: {
+        color: {
+          brand: {
+            $type: 'color',
+            $value: '#2563EB',
+            $description: 'Brand color',
+            $extensions: {
+              owner: 'design-system',
+            },
+          },
+        },
+        spacing: {
+          md: {
+            $type: 'dimension',
+            $value: '16px',
+          },
+        },
+      },
+      semantic: {
+        color: {
+          action: {
+            $type: 'color',
+            $value: '{primitive.color.brand}',
+            $deprecated: 'Use semantic.color.brand instead',
+          },
+        },
+      },
+    }),
+    'tokens.json',
+  );
+
+  const brand = tokens.recordsById.get('primitive.color.brand');
+  const action = tokens.recordsById.get('semantic.color.action');
+  const spacing = tokens.recordsById.get('primitive.spacing.md');
+
+  assert.equal(brand?.normalizedResolvedValue, '#2563eb');
+  assert.equal(brand?.type, 'color');
+  assert.equal(brand?.metadata?.sourceFormat, 'dtcg');
+  assert.equal(brand?.metadata?.description, 'Brand color');
+  assert.deepEqual(brand?.metadata?.extensions, {
+    owner: 'design-system',
+  });
+  assert.equal(action?.normalizedResolvedValue, '#2563eb');
+  assert.equal(action?.aliasOf, 'primitive.color.brand');
+  assert.equal(
+    action?.metadata?.deprecated,
+    'Use semantic.color.brand instead',
+  );
+  assert.equal(spacing?.type, 'spacing');
+  assert.equal(spacing?.normalizedResolvedValue, '16px');
+});
+
+test('parseTokens resolves DTCG alias chains', () => {
+  const tokens = parseTokens(
+    JSON.stringify({
+      primitive: {
+        color: {
+          blue: {
+            $type: 'color',
+            $value: '#2563EB',
+          },
+        },
+      },
+      semantic: {
+        color: {
+          brand: {
+            $type: 'color',
+            $value: '{primitive.color.blue}',
+          },
+          action: {
+            $type: 'color',
+            $value: '{semantic.color.brand}',
+          },
+        },
+      },
+    }),
+    'tokens.json',
+  );
+
+  assert.equal(
+    tokens.recordsById.get('semantic.color.action')?.normalizedResolvedValue,
+    '#2563eb',
+  );
+  assert.equal(
+    tokens.recordsById.get('semantic.color.action')?.aliasOf,
+    'semantic.color.brand',
+  );
 });
 
 test('parseTokens resolves TypeScript aliases and preserves alias metadata', () => {
@@ -78,9 +179,18 @@ test('parseTokens resolves TypeScript aliases and preserves alias metadata', () 
     'tokens.ts',
   );
 
-  assert.equal(tokens.recordsById.get('semantic.color.text')?.normalizedResolvedValue, '#ff0000');
-  assert.equal(tokens.recordsById.get('semantic.color.text')?.aliasOf, 'primitive.color.red');
-  assert.equal(tokens.recordsById.get('semantic.color.text')?.rawValue, 'primitive.color.red');
+  assert.equal(
+    tokens.recordsById.get('semantic.color.text')?.normalizedResolvedValue,
+    '#ff0000',
+  );
+  assert.equal(
+    tokens.recordsById.get('semantic.color.text')?.aliasOf,
+    'primitive.color.red',
+  );
+  assert.equal(
+    tokens.recordsById.get('semantic.color.text')?.rawValue,
+    'primitive.color.red',
+  );
 });
 
 test('parseTokens unwraps parenthesized and TypeScript asserted expressions', () => {
@@ -122,7 +232,9 @@ test('parseTokens supports negative numeric values and component token metadata'
     'tokens.ts',
   );
 
-  const record = tokens.recordsById.get('component.button.primary.borderRadius');
+  const record = tokens.recordsById.get(
+    'component.button.primary.borderRadius',
+  );
 
   assert.equal(record?.normalizedResolvedValue, '-8');
   assert.equal(record?.type, 'radius');
@@ -153,8 +265,14 @@ test('parseTokens supports string and numeric object keys and bracket member acc
     'tokens.ts',
   );
 
-  assert.equal(tokens.recordsById.get('primitive.color.100')?.normalizedResolvedValue, '#ff0000');
-  assert.equal(tokens.recordsById.get('semantic.color.critical')?.aliasOf, 'primitive.color.100');
+  assert.equal(
+    tokens.recordsById.get('primitive.color.100')?.normalizedResolvedValue,
+    '#ff0000',
+  );
+  assert.equal(
+    tokens.recordsById.get('semantic.color.critical')?.aliasOf,
+    'primitive.color.100',
+  );
 });
 
 test('parseTokens rejects unsupported file extensions', () => {
@@ -212,5 +330,29 @@ test('parseTokens rejects circular TypeScript token references', () => {
         'tokens.ts',
       ),
     /Circular token reference detected for "primitive"|Circular token reference detected for "semantic"/,
+  );
+});
+
+test('parseTokens rejects circular DTCG token references', () => {
+  assert.throws(
+    () =>
+      parseTokens(
+        JSON.stringify({
+          semantic: {
+            color: {
+              a: {
+                $type: 'color',
+                $value: '{semantic.color.b}',
+              },
+              b: {
+                $type: 'color',
+                $value: '{semantic.color.a}',
+              },
+            },
+          },
+        }),
+        'tokens.json',
+      ),
+    /Circular DTCG token reference detected/,
   );
 });

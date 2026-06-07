@@ -46,6 +46,16 @@ interface TokenSourceAdapter {
   supports(extension: string): boolean;
 }
 
+interface DtcgLeaf {
+  path: string[];
+  rawValue: unknown;
+  value: unknown;
+  type?: string;
+  description?: string;
+  extensions?: unknown;
+  deprecated?: unknown;
+}
+
 function isTokenValue(value: unknown): value is TokenValue {
   return typeof value === 'string' || typeof value === 'number';
 }
@@ -148,6 +158,33 @@ function getTokenTypeFromGroup(group: string): TokenType {
   }
 
   return 'unknown';
+}
+
+function getTokenTypeFromDtcgType(
+  dtcgType: string | undefined,
+  group: string,
+): TokenType | undefined {
+  if (!dtcgType) {
+    return undefined;
+  }
+
+  if (dtcgType === 'color') {
+    return 'color';
+  }
+
+  if (dtcgType === 'typography' || dtcgType === 'shadow') {
+    return dtcgType;
+  }
+
+  if (dtcgType === 'dimension') {
+    const inferredType = getTokenTypeFromGroup(group);
+
+    return inferredType === 'spacing' || inferredType === 'radius'
+      ? inferredType
+      : 'unknown';
+  }
+
+  return undefined;
 }
 
 function buildFlattenedToken(record: TokenRecord): FlattenedToken {
@@ -256,11 +293,15 @@ function flattenTokenRecords(
     const id = segments.join('.');
     const level = getTokenLayerFromSegments(segments);
     const group = getTokenGroupFromSegments(segments, level);
-    const type = getTokenTypeFromGroup(group);
+    const leafInfo = leafInfoByPath.get(id);
+    const dtcgType =
+      typeof leafInfo?.metadata?.dtcgType === 'string'
+        ? leafInfo.metadata.dtcgType
+        : undefined;
+    const type =
+      getTokenTypeFromDtcgType(dtcgType, group) ?? getTokenTypeFromGroup(group);
 
     if (isTokenValue(value)) {
-      const leafInfo = leafInfoByPath.get(id);
-
       records.push({
         id,
         path: segments,
@@ -542,11 +583,179 @@ function evaluateTokenExpression(
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function containsDtcgToken(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (Object.hasOwn(value, '$value')) {
+    return true;
+  }
+
+  return Object.values(value).some(containsDtcgToken);
+}
+
+function setTokenNodeValue(
+  tree: TokenNode,
+  pathSegments: string[],
+  value: TokenValue,
+): void {
+  let currentNode = tree;
+
+  for (const segment of pathSegments.slice(0, -1)) {
+    const nextNode = currentNode[segment];
+
+    if (!isTokenNode(nextNode)) {
+      currentNode[segment] = {};
+    }
+
+    currentNode = currentNode[segment] as TokenNode;
+  }
+
+  const leafSegment = pathSegments[pathSegments.length - 1];
+
+  if (leafSegment) {
+    currentNode[leafSegment] = value;
+  }
+}
+
+function collectDtcgLeaves(
+  node: unknown,
+  pathSegments: string[],
+  inheritedType: string | undefined,
+  leaves: Map<string, DtcgLeaf>,
+): void {
+  if (!isRecord(node)) {
+    throw new Error(
+      `Invalid DTCG token group at "${pathSegments.join('.') || '<root>'}"`,
+    );
+  }
+
+  const ownType = typeof node.$type === 'string' ? node.$type : inheritedType;
+
+  if (Object.hasOwn(node, '$value')) {
+    leaves.set(pathSegments.join('.'), {
+      path: pathSegments,
+      rawValue: node.$value,
+      value: node.$value,
+      type: ownType,
+      description:
+        typeof node.$description === 'string' ? node.$description : undefined,
+      extensions: node.$extensions,
+      deprecated: node.$deprecated,
+    });
+    return;
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key.startsWith('$')) {
+      continue;
+    }
+
+    collectDtcgLeaves(value, [...pathSegments, key], ownType, leaves);
+  }
+}
+
+function getDtcgReference(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const match = value.trim().match(/^\{([^{}]+)\}$/);
+
+  return match?.[1]?.trim();
+}
+
+function resolveDtcgLeafValue(
+  leafId: string,
+  leaves: Map<string, DtcgLeaf>,
+  cache: Map<string, TokenValue>,
+  resolving = new Set<string>(),
+): TokenValue {
+  const cachedValue = cache.get(leafId);
+
+  if (cachedValue !== undefined) {
+    return cachedValue;
+  }
+
+  if (resolving.has(leafId)) {
+    throw new Error(`Circular DTCG token reference detected for "${leafId}"`);
+  }
+
+  const leaf = leaves.get(leafId);
+
+  if (!leaf) {
+    throw new Error(`Unknown DTCG token reference "${leafId}"`);
+  }
+
+  if (isTokenValue(leaf.value)) {
+    const referencePath = getDtcgReference(leaf.value);
+
+    if (!referencePath) {
+      cache.set(leafId, leaf.value);
+      return leaf.value;
+    }
+
+    resolving.add(leafId);
+    const resolvedValue = resolveDtcgLeafValue(
+      referencePath,
+      leaves,
+      cache,
+      resolving,
+    );
+    resolving.delete(leafId);
+    cache.set(leafId, resolvedValue);
+    return resolvedValue;
+  }
+
+  throw new Error(`Unsupported DTCG token value at "${leafId}"`);
+}
+
+function normalizeDtcgTokens(
+  parsed: TokenNode,
+  sourcePath: string,
+): LoadedTokens {
+  const leaves = new Map<string, DtcgLeaf>();
+  const cache = new Map<string, TokenValue>();
+  const tree: TokenNode = {};
+  const leafInfoByPath = new Map<string, TokenLeafInfo>();
+
+  collectDtcgLeaves(parsed, [], undefined, leaves);
+
+  for (const [leafId, leaf] of leaves) {
+    const resolvedValue = resolveDtcgLeafValue(leafId, leaves, cache);
+    const aliasOf = getDtcgReference(leaf.value);
+
+    setTokenNodeValue(tree, leaf.path, resolvedValue);
+    leafInfoByPath.set(leafId, {
+      rawValue: leaf.rawValue,
+      aliasOf,
+      metadata: {
+        sourceFormat: 'dtcg',
+        dtcgType: leaf.type,
+        description: leaf.description,
+        extensions: leaf.extensions,
+        deprecated: leaf.deprecated,
+      },
+    });
+  }
+
+  return createLoadedTokens(tree, sourcePath, leafInfoByPath);
+}
+
 function parseJsonTokens(rawContent: string, sourcePath: string): LoadedTokens {
   const parsed: unknown = JSON.parse(rawContent);
 
   if (!isTokenNode(parsed)) {
     throw new Error(`Token file must contain a JSON object: ${sourcePath}`);
+  }
+
+  if (containsDtcgToken(parsed)) {
+    return normalizeDtcgTokens(parsed, sourcePath);
   }
 
   return createLoadedTokens(parsed, sourcePath);

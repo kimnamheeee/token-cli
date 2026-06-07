@@ -15,6 +15,11 @@ token-validator scan ./src --tokens ./tokens.json --report summary --limit 10
 token-validator scan ./src/Button.tsx --config ./token-validator.config.json
 ```
 
+Token sources can be plain nested JSON, TypeScript/JavaScript object exports, or
+DTCG-style JSON using `$value` and `$type`. DTCG `{path.to.token}` references are
+resolved, and `$description`, `$extensions`, and `$deprecated` are preserved as
+token metadata.
+
 CLI options override config values.
 
 Create a config interactively:
