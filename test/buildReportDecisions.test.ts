@@ -40,7 +40,11 @@ function createAmbiguousIssue(
       {
         id: 'semantic.color.text.inverse',
         score: 45,
-        reasons: ['matches color role keyword: text'],
+        reasons: [
+          'matches color role keyword: text',
+          'token aliases another token instead of using a raw primitive value',
+        ],
+        intentSignals: ['property-role', 'token-alias'],
       },
       {
         id: 'semantic.color.icon.inverse',
@@ -91,6 +95,7 @@ test('buildReportDecisions separates safe, ambiguous, unknown, and unsupported d
             id: 'semantic.color.text.inverse',
             score: 30,
             reasons: ['matches color role keyword: text'],
+            intentSignals: ['property-role'],
           },
           {
             id: 'semantic.color.text.default',
@@ -148,6 +153,7 @@ test('buildReportDecisions separates safe, ambiguous, unknown, and unsupported d
   assert.equal(ambiguousDecisions[0]?.severity, 'warning');
   assert.deepEqual(ambiguousDecisions[0]?.missingContext, [
     'strong property or component context',
+    'at least two independent intent signals',
     'clear score separation between candidates',
     'narrower semantic intent',
   ]);
@@ -159,6 +165,39 @@ test('buildReportDecisions separates safe, ambiguous, unknown, and unsupported d
     decisions.find((decision) => decision.decision === 'unsupported')?.severity,
     'info',
   );
+});
+
+test('buildReportDecisions keeps high score ambiguous matches in review when intent signals are thin', () => {
+  const classifiedIssues: ClassifiedIssueSets = {
+    deterministic: [],
+    ambiguous: [
+      createAmbiguousIssue({
+        rankedCandidates: [
+          {
+            id: 'semantic.color.text.inverse',
+            score: 45,
+            reasons: ['matches color role keyword: text'],
+            intentSignals: ['property-role'],
+          },
+          {
+            id: 'primitive.color.white',
+            score: 15,
+            reasons: ['primitive token is a fallback candidate'],
+          },
+        ],
+      }),
+    ],
+    noCandidate: [],
+    unsupported: [],
+  };
+
+  const [decision] = buildReportDecisions(classifiedIssues);
+
+  assert.equal(decision?.decision, 'ambiguous');
+  assert.deepEqual(decision?.missingContext, [
+    'at least two independent intent signals',
+    'narrower semantic intent',
+  ]);
 });
 
 test('buildReportDecisions marks primitive-only replacements as info', () => {

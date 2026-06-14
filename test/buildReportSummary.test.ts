@@ -35,7 +35,11 @@ function createAmbiguousIssue(
       {
         id: 'semantic.color.text.primary',
         score: 45,
-        reasons: ['matches color role keyword: text'],
+        reasons: [
+          'matches color role keyword: text',
+          'token aliases another token instead of using a raw primitive value',
+        ],
+        intentSignals: ['property-role', 'token-alias'],
       },
       {
         id: 'primitive.color.red500',

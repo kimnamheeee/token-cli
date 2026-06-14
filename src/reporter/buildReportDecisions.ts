@@ -70,6 +70,10 @@ function hasNegativeReason(candidate: RankedTokenCandidate): boolean {
   });
 }
 
+function getIntentSignalCount(candidate: RankedTokenCandidate): number {
+  return new Set(candidate.intentSignals ?? []).size;
+}
+
 export function getRecommendationConfidence(
   match: AmbiguousTokenMatch,
 ): RecommendationConfidence {
@@ -107,9 +111,14 @@ function getMissingContext(
   scoreGap: number,
 ): string[] {
   const missingContext: string[] = [];
+  const [topCandidate] = match.rankedCandidates ?? [];
 
   if (confidence === 'low') {
     missingContext.push('strong property or component context');
+  }
+
+  if (!topCandidate || getIntentSignalCount(topCandidate) < 2) {
+    missingContext.push('at least two independent intent signals');
   }
 
   if (scoreGap < 10) {
@@ -136,6 +145,7 @@ function isSafeAmbiguousReplacement(
   return (
     confidence === 'high' &&
     getScoreGap(candidates) >= 20 &&
+    getIntentSignalCount(topCandidate) >= 2 &&
     !hasNegativeReason(topCandidate)
   );
 }

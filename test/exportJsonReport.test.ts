@@ -109,7 +109,11 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
           {
             id: 'semantic.color.text.primary',
             score: 45,
-            reasons: ['matches color role keyword: text'],
+            reasons: [
+              'matches color role keyword: text',
+              'token aliases another token instead of using a raw primitive value',
+            ],
+            intentSignals: ['property-role', 'token-alias'],
           },
           {
             id: 'semantic.color.icon.primary',
@@ -132,8 +136,12 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
             {
               id: 'semantic.spacing.md',
               score: 98,
+              kind: 'adjacent-scale-value',
+              reviewOnly: true,
+              distance: 2,
+              scaleStepsAway: 1,
               reasons: [
-                'spacing scale is 2 away from 16',
+                'spacing scale is adjacent to 16',
                 'nearby candidate only; not an exact replacement',
               ],
             },
@@ -212,7 +220,11 @@ test('exportClassifiedJsonReport writes sorted issues with classification metada
     {
       id: 'semantic.color.text.primary',
       score: 45,
-      reasons: ['matches color role keyword: text'],
+      reasons: [
+        'matches color role keyword: text',
+        'token aliases another token instead of using a raw primitive value',
+      ],
+      intentSignals: ['property-role', 'token-alias'],
     },
     {
       id: 'semantic.color.icon.primary',

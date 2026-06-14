@@ -249,6 +249,97 @@ test('rankTokenCandidates uses component context without making component tokens
   assert.match(unrelatedRanking[1]?.reasons.join(' ') ?? '', /does not match/);
 });
 
+test('rankTokenCandidates covers role keywords, metadata words, and tie breakers', () => {
+  const borderRanking = rankTokenCandidates(
+    createDetectedValue({
+      property: 'borderColor',
+    }),
+    [
+      createRecord('semantic.color.text.default', '#ff0000', 'color'),
+      createRecord('semantic.color.border.subtle', '#ff0000', 'color'),
+    ],
+  );
+
+  assert.equal(borderRanking[0]?.id, 'semantic.color.border.subtle');
+  assert.match(borderRanking[0]?.reasons.join(' ') ?? '', /borderColor role/);
+
+  const radiusRanking = rankTokenCandidates(
+    createDetectedValue({
+      property: 'borderRadius',
+      rawValue: '8',
+      normalizedValue: '8',
+      tokenGroup: 'radius',
+    }),
+    [
+      createRecord('semantic.radius.surface', '8', 'radius'),
+      createRecord('semantic.corner.control', '8', 'radius', {
+        metadata: {
+          role: 'control',
+        },
+      }),
+    ],
+  );
+
+  assert.equal(radiusRanking[0]?.id, 'semantic.corner.control');
+  assert.match(radiusRanking[0]?.reasons.join(' ') ?? '', /control/);
+
+  const spacingRanking = rankTokenCandidates(
+    createDetectedValue({
+      property: 'marginTop',
+      rawValue: '12',
+      normalizedValue: '12',
+      valueType: 'number',
+      tokenGroup: 'spacing',
+    }),
+    [
+      createRecord('semantic.spacing.inset.md', '12', 'spacing'),
+      createRecord('semantic.spacing.stack.md', '12', 'spacing'),
+    ],
+  );
+
+  assert.equal(spacingRanking[0]?.id, 'semantic.spacing.stack.md');
+
+  const tiedRanking = rankTokenCandidates(
+    createDetectedValue({
+      property: 'opacity',
+    }),
+    [
+      createRecord('primitive.color.alpha', '#ff0000', 'color', {
+        level: 'primitive',
+      }),
+      createRecord('semantic.color.alpha', '#ff0000', 'color'),
+      createRecord('component.alert.alpha', '#ff0000', 'color', {
+        level: 'component',
+        metadata: {
+          component: 'alert',
+        },
+      }),
+    ],
+  );
+
+  assert.deepEqual(
+    tiedRanking.map((candidate) => candidate.id),
+    [
+      'semantic.color.alpha',
+      'primitive.color.alpha',
+      'component.alert.alpha',
+    ],
+  );
+
+  const exactRanking = rankTokenCandidates(
+    createDetectedValue({
+      property: 'opacity',
+    }),
+    [
+      createRecord('unknown.alpha', '#ff0000', 'color', {
+        level: 'unknown',
+      }),
+    ],
+  );
+
+  assert.match(exactRanking[0]?.reasons.join(' ') ?? '', /exact value match/);
+});
+
 test('classifyIssues attaches ranked candidates without changing ambiguous classification', () => {
   const tokens = createLoadedTokens([
     createRecord('primitive.color.slate900', '#ff0000', 'color', {
@@ -294,7 +385,31 @@ test('findNearbyTokenCandidates returns nearby scale and hex candidates without 
     nearbySpacing.map((candidate) => candidate.id),
     ['semantic.spacing.md', 'semantic.spacing.sm', 'semantic.spacing.lg'],
   );
+  assert.equal(nearbySpacing[0]?.kind, 'adjacent-scale-value');
+  assert.equal(nearbySpacing[0]?.reviewOnly, true);
+  assert.equal(nearbySpacing[0]?.scaleStepsAway, 1);
+  assert.equal(nearbySpacing[0]?.scaleDistanceRatio, 0.5);
   assert.match(nearbySpacing[0]?.reasons.join(' ') ?? '', /nearby candidate/i);
+
+  const scaleAwareSpacing = findNearbyTokenCandidates(
+    createDetectedValue({
+      property: 'padding',
+      rawValue: '22',
+      normalizedValue: '22',
+      valueType: 'number',
+      tokenGroup: 'spacing',
+    }),
+    spacingCandidates,
+  );
+
+  assert.deepEqual(
+    scaleAwareSpacing.map((candidate) => candidate.id),
+    ['semantic.spacing.lg', 'semantic.spacing.md', 'semantic.spacing.sm'],
+  );
+  assert.equal(scaleAwareSpacing[0]?.scaleDistanceRatio, 0.25);
+  assert.ok(
+    (scaleAwareSpacing[0]?.score ?? 0) > (nearbySpacing[0]?.score ?? 0),
+  );
 
   const nearbyColors = findNearbyTokenCandidates(
     createDetectedValue({
@@ -308,6 +423,8 @@ test('findNearbyTokenCandidates returns nearby scale and hex candidates without 
   );
 
   assert.equal(nearbyColors[0]?.id, 'semantic.color.surface.default');
+  assert.equal(nearbyColors[0]?.kind, 'perceptual-color-nearby');
+  assert.equal(nearbyColors[0]?.reviewOnly, true);
 });
 
 test('classifyIssues attaches no-candidate diagnostics with nearby candidates', () => {
@@ -339,5 +456,9 @@ test('classifyIssues attaches no-candidate diagnostics with nearby candidates', 
       (candidate) => candidate.id,
     ),
     ['semantic.spacing.md', 'semantic.spacing.sm'],
+  );
+  assert.equal(
+    classified.noCandidate[0]?.diagnostics?.nearbyCandidates?.[0]?.reviewOnly,
+    true,
   );
 });

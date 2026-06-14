@@ -115,6 +115,7 @@ function scoreCandidate(
 ): RankedTokenCandidate {
   let score = 0;
   const reasons: string[] = [];
+  const intentSignals: string[] = [];
   const candidateWords = getCandidateWords(candidate);
   const matchedRoleKeywords = getRoleKeywords(detectedValue.property).filter(
     (keyword) => candidateWords.has(keyword),
@@ -125,6 +126,7 @@ function scoreCandidate(
     reasons.push(
       `matches ${detectedValue.property} role keyword: ${matchedRoleKeywords.join(', ')}`,
     );
+    intentSignals.push('property-role');
   }
 
   if (candidate.level === 'semantic') {
@@ -142,6 +144,7 @@ function scoreCandidate(
   ) {
     score += 18;
     reasons.push('component token matches the file context');
+    intentSignals.push('component-context');
   }
 
   if (isUnrelatedComponentToken(detectedValue, candidate)) {
@@ -158,6 +161,7 @@ function scoreCandidate(
     reasons.push(
       'token aliases another token instead of using a raw primitive value',
     );
+    intentSignals.push('token-alias');
   }
 
   if (reasons.length === 0) {
@@ -168,6 +172,8 @@ function scoreCandidate(
     id: candidate.id,
     score,
     reasons,
+    kind: 'exact-value-match',
+    intentSignals,
   };
 }
 

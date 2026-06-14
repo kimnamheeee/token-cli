@@ -84,3 +84,68 @@ test('loadConfig validates report mode and limit', () => {
     /report\.mode.*summary.*detailed/i,
   );
 });
+
+test('loadConfig validates root, array, string, sources, authority, and format fields', () => {
+  const cases: Array<{
+    value: unknown;
+    message: RegExp;
+  }> = [
+    {
+      value: [],
+      message: /Config root must be an object/,
+    },
+    {
+      value: {
+        include: ['src/**/*.tsx', 1],
+      },
+      message: /include.*array of strings/,
+    },
+    {
+      value: {
+        tokens: 42,
+      },
+      message: /tokens.*string/,
+    },
+    {
+      value: {
+        sources: 'DESIGN.md',
+      },
+      message: /sources.*object/,
+    },
+    {
+      value: {
+        authority: 'both',
+      },
+      message: /authority.*design-md.*code.*compare-only/,
+    },
+    {
+      value: {
+        report: {
+          format: 'text',
+        },
+      },
+      message: /report\.format.*json/,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const tempDir = createTempDir();
+    const configPath = path.join(tempDir, 'invalid.json');
+
+    writeFileSync(configPath, JSON.stringify(testCase.value), 'utf8');
+
+    assert.throws(
+      () => loadConfig(configPath, tempDir),
+      testCase.message,
+    );
+  }
+});
+
+test('loadConfig throws for a missing explicit config path', () => {
+  const tempDir = createTempDir();
+
+  assert.throws(
+    () => loadConfig('missing.json', tempDir),
+    /Config file not found/,
+  );
+});

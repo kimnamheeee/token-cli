@@ -89,6 +89,16 @@ export interface RankedTokenCandidate {
   id: string;
   score: number;
   reasons: string[];
+  kind?:
+    | 'exact-value-match'
+    | 'perceptual-color-nearby'
+    | 'adjacent-scale-value'
+    | 'numeric-nearby';
+  reviewOnly?: boolean;
+  distance?: number;
+  scaleStepsAway?: number;
+  scaleDistanceRatio?: number;
+  intentSignals?: string[];
 }
 
 export interface AmbiguousTokenMatch extends DetectedHardcodedValue {

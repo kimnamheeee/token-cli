@@ -105,3 +105,63 @@ test('buildConsolidationReport uses DTCG replacement metadata', () => {
     'semantic.color.surface',
   ]);
 });
+
+test('buildConsolidationReport reports deprecated, near, and unused tokens', () => {
+  const tokens = parseTokens(
+    JSON.stringify({
+      semantic: {
+        color: {
+          legacyText: {
+            $type: 'color',
+            $value: '#111111',
+            $deprecated: true,
+          },
+          textDefault: {
+            $type: 'color',
+            $value: '#111111',
+          },
+          nearText: {
+            $type: 'color',
+            $value: '#111112',
+          },
+        },
+        radius: {
+          surface: {
+            $type: 'dimension',
+            $value: 8,
+          },
+          overlay: {
+            $type: 'dimension',
+            $value: 10,
+          },
+        },
+      },
+    }),
+    'tokens.json',
+  );
+  const report = buildConsolidationReport(tokens, {
+    detectedValues: [
+      createDetectedValue('#111111', '#111111', 'color'),
+      createDetectedValue('8', '8', 'borderRadius'),
+    ],
+  });
+
+  assert.equal(report.sameValueGroups[0]?.recommendation, 'deprecate');
+  assert.deepEqual(report.sameValueGroups[0]?.deprecatedTokens, [
+    'semantic.color.legacyText',
+  ]);
+  assert.equal(report.summary.deprecatedTokens, 1);
+  assert.ok(report.summary.nearValueGroups >= 2);
+  assert.ok(
+    report.nearValueGroups.some(
+      (group) =>
+        group.leftToken === 'semantic.color.legacyText' &&
+        group.rightToken === 'semantic.color.nearText',
+    ),
+  );
+  assert.ok(
+    report.unusedTokens.some(
+      (token) => token.token === 'semantic.color.nearText',
+    ),
+  );
+});
